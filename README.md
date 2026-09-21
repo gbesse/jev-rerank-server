@@ -1,0 +1,135 @@
+# jev-rerank-server
+
+**A drop-in rerank API served by Jev for teams whose RAG stack already has a "rerank base URL" setting.**
+
+[![Tests](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml/badge.svg)](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml)
+[MIT](LICENSE) · Node.js 22+ · No runtime dependencies · Public alpha
+
+The server speaks the Cohere `/v1/rerank` and `/v2/rerank`, Jina `/v1/rerank` and Voyage `/v1/rerank` request and
+response shapes. LangChain, LlamaIndex, Haystack, Dify, Open WebUI and any client with a configurable rerank endpoint
+can use Jev by changing a URL. Each (query, document) pair becomes one typed yes/no question to Jev; the returned
+probability is the relevance score.
+
+```text
+POST /v2/rerank { query, documents, top_n }
+   → one Jev request per document: state { query, passage }, noul "relevant"
+   → relevance_score = probability, sorted, top_n applied
+   → Cohere/Jina envelope (or Voyage envelope when top_k was sent)
+```
+
+## Try it in 30 seconds
+
+```sh
+git clone https://github.com/gbesse/jev-rerank-server.git
+cd jev-rerank-server
+npm run demo
+npm test
+```
+
+The demo starts the server on loopback with a synthetic provider and sends Cohere-, Jina- and Voyage-shaped requests.
+No key, install or build is required. The demo and test scores are synthetic (share of query words found in the passage),
+not measured Jev output.
+
+## Call real Jev
+
+```sh
+export TYPESAFE_API_KEY=...        # requests are paid and go to https://api.typesafe.ai/v1/systemone
+npx jev-rerank-server --port 8787 --host 127.0.0.1
+curl -s http://127.0.0.1:8787/v2/rerank -H 'content-type: application/json' \
+  -d '{"query":"How long do I have to return shoes?","documents":["Returns are accepted within 30 days.","Free shipping above 80 euros."],"top_n":1,"return_documents":true}'
+```
+
+Options: `--pack N` (passages per Jev request, default 1), `--token TOKEN` (bearer clients must send). Environment:
+`TYPESAFE_API_KEY` (required), `RERANK_SERVER_TOKEN`, `JEV_RERANK_PACK`, `JEV_CONCURRENCY` (default 8),
+`JEV_REQUESTS_PER_MINUTE` (default 1,000), `JEV_ENDPOINT` (HTTPS only, loopback HTTP for tests).
+
+Every response reports `usage.total_tokens`, `usage.jev_requests` and `usage.estimated_cost_usd`
+(`input_tokens × 0.042 / 1e6`, an estimate from the published price list, not a bill). With the default pairwise mode,
+reranking 20 documents of about 500 characters costs roughly 20 × 180 tokens ≈ 3,600 tokens ≈ USD 0.00015.
+
+Docker: `docker compose up` builds `node:24-alpine` with no build step and publishes `127.0.0.1:8787`; set
+`TYPESAFE_API_KEY` in the host environment first.
+
+The official SDKs (`@typesafe-ai/sdk` on npm, `typesafe-sdk` on PyPI) are an alternative for your own code; this server
+ships its own minimal client so nothing extra is installed.
+
+## Point your framework at it
+
+See [docs/integrations.md](docs/integrations.md) for LangChain, LlamaIndex, Haystack, Dify and Open WebUI snippets
+(written from public documentation, not executed here) and [docs/protocol.md](docs/protocol.md) for the exact contract.
+
+Use it as a library when you want the pipeline without HTTP:
+
+```js
+import { createJevClient, createRerankServer, rerank } from '@gbesse/jev-rerank-server';
+
+const provider = createJevClient();                 // reads TYPESAFE_API_KEY
+const response = await rerank({ query, documents, top_n: 5 }, { provider });
+console.log(response.results, response.usage.estimated_cost_usd);
+
+createRerankServer({ provider, token: process.env.RERANK_SERVER_TOKEN }).listen(8787, '127.0.0.1');
+```
+
+Errors propagate: a failed Jev call rejects `rerank()` and yields an HTTP 502 with `{ message }` from the server. Tests
+use `createSyntheticRerankProvider()` or `createFakeProvider(fixtures)`, which never touch the network.
+
+## How it decides
+
+Pairwise mode (default, one request per document), faithful to TypeSafe's rerank cookbook:
+
+- State: `{ "query": "<query>", "passage": "<document text>" }`.
+- Question `relevant`, type `noul`, instructions: *"Does the passage directly answer the query or contain the specific
+  information the query asks for?"*
+- Criteria true: *"The passage states the specific fact, answer or content the query is looking for."*
+  Criteria false: *"The passage is only on a related topic, mentions the same words, or does not contain what the query
+  asks for."*
+- `relevance_score` is the returned probability, unchanged. Results are sorted descending; ties keep the original order;
+  `top_n`/`top_k` is applied after sorting.
+
+Packed mode (`--pack N`, 2 to 20): one request holds up to N passages as `{ query, passages: { p1, p2, ... } }` with one
+`noul` per passage naming its id. It divides the number of requests by N but puts N−1 irrelevant passages in every
+question's state, and Jev's accuracy drops with irrelevant state. Use it when throughput matters more than ordering
+precision, and measure on your own data first.
+
+Code-owned rules: model names are echoed and always served by `jev-1.13.0`; the response `model` is verified against the
+request; documents over 20,000 characters are truncated and flagged with `truncated: true`; more than 1,000 documents or
+a query over 4,000 characters is a 400; `max_chunks_per_doc` is ignored with a warning; states over an estimated 24,000
+tokens are refused before sending. Jev calls run through an in-process limiter (8 concurrent, 1,000 requests per
+minute) and retry only on 429, 529 and network errors with jittered backoff, honouring `retry-after`. One failed
+request aborts the others and the call returns 502 rather than a partial ranking.
+
+## Boundaries
+
+- No relevance benchmark was run for this release. TypeSafe's cookbook reports a top-10 accuracy improvement on one
+  legal task with this question design; your corpus will differ. Calibrate on a labeled sample before trusting the order.
+- One document is one Jev question; the score depends on the query and passage only. There is no cross-document
+  comparison, no chunking, no semantic embedding fallback.
+- Jev reads instructions literally, counts unreliably and compares numbers and dates poorly. Queries such as "the
+  cheapest option" or "documents after March 2024" get keyword-level judgments, not arithmetic.
+- Documents are sent as-is: injected instructions inside a passage can sway its score. Do not rerank untrusted text for
+  authorization decisions.
+- English works best; other languages work with lower accuracy.
+- Not a hosted service: bind to loopback or put it behind your own TLS and authentication. `RERANK_SERVER_TOKEN` is a
+  shared secret, not user management.
+- `return_documents` defaults to `false` on every route, unlike Jina's own API.
+
+## Validation
+
+```sh
+npm run check       # node --check on every .mjs
+npm run typecheck   # tsc --noEmit against docs/public-api-types.mts (needs npm ci --ignore-scripts)
+npm test            # node --test against a fake Jev server on loopback
+npm run demo        # offline synthetic run
+```
+
+CI runs the same four commands on Node 22 and 24. `scripts/live-smoke.mjs` makes at most two paid Jev requests with
+synthetic input when `TYPESAFE_API_KEY` is set and exits non-zero otherwise; it is never run in CI.
+
+## Related projects
+
+- [DecisionPacks](https://github.com/gbesse/decisionpacks): versioned decision contracts with the same Jev client design.
+- [Autonomy Meter](https://github.com/gbesse/autonomy-meter): calibrate thresholds on labeled outcomes with a holdout.
+- [Question Forge](https://github.com/gbesse/question-forge): author and test Jev questions before wiring them.
+
+Independent project; not affiliated with TypeSafe AI. Protocol reference:
+[TypeSafe API](https://docs.typesafe.ai/api) and [known model limitations](https://docs.typesafe.ai/model-jaggedness/jev-1.13).

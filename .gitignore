@@ -1,0 +1,16 @@
+# Purpose: Keep dependencies, credentials, caches and local data out of source control.
+node_modules/
+.env
+.env.*
+!.env.example
+.local/
+local-data/
+*.sqlite*
+__pycache__/
+.venv/
+dist/
+*.egg-info/
+.jev-cache*
+coverage/
+*.log
+.DS_Store

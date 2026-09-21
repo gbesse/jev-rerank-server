@@ -1,0 +1,9 @@
+# Purpose: Keep the Docker build context to what the server needs at runtime.
+node_modules
+.git
+.github
+test
+ai
+.local
+local-data
+*.log

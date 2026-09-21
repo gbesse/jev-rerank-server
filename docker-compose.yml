@@ -1,0 +1,16 @@
+# Purpose: Example Compose service exposing the rerank API on localhost:8787 with the key taken from the host environment.
+services:
+  jev-rerank:
+    build: .
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:?Set TYPESAFE_API_KEY}
+      RERANK_SERVER_TOKEN: ${RERANK_SERVER_TOKEN:-}
+      JEV_RERANK_PACK: ${JEV_RERANK_PACK:-1}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
