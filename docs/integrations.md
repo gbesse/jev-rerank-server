@@ -4,13 +4,24 @@ description: How to point LangChain, LlamaIndex, Haystack, Dify and Open WebUI a
 
 # Integrations
 
-Start the server first (`TYPESAFE_API_KEY=... npx jev-rerank-server --port 8787`). Every snippet below was **written from
-public documentation on 2026-09-21 and not executed here**; parameter names in third-party libraries change, so check
-your installed version if a call fails. If you set `RERANK_SERVER_TOKEN`, use that value as the client-side API key;
-otherwise any non-empty string works because the server ignores it.
+Start the server first (`TYPESAFE_API_KEY=... npm start -- --port 8787`). The Cohere Python v2 client is executed in CI
+against the real package and the local synthetic server. The framework-specific snippets are contract documentation;
+their full frameworks are not installed in CI. If you set `RERANK_SERVER_TOKEN`, use that value as the client-side API
+key; otherwise any non-empty string works because the server ignores it.
 
 The server answers on `/v1/rerank`, `/v2/rerank` and `/rerank`, so both "base URL + `/v1/rerank`" and "base URL +
 `/rerank`" client conventions reach it.
+
+## Cohere Python v2 — executed in CI
+
+```python
+import cohere
+
+client = cohere.ClientV2(api_key="client-token", base_url="http://127.0.0.1:8787", timeout=10)
+response = client.rerank(model="rerank-v3.5", query="How long can I return shoes?", documents=documents, top_n=5)
+```
+
+`npm run test:cohere` executes this flow with `cohere==5.21.1`; see `integrations/cohere_v2_smoke.py`.
 
 ## LangChain (Python, `langchain-cohere`)
 
@@ -24,7 +35,8 @@ reranker = CohereRerank(client=client, model="jev-1.13.0", top_n=5)
 docs = reranker.compress_documents(documents, query="How long do I have to return shoes?")
 ```
 
-Some `langchain-cohere` versions also accept `CohereRerank(base_url=...)` directly. Written from public docs, not executed here.
+Some `langchain-cohere` versions also accept `CohereRerank(base_url=...)` directly. The underlying Cohere client path is
+tested; this wrapper snippet is not executed in CI.
 
 ## LlamaIndex (Python, `llama-index-postprocessor-cohere-rerank`)
 

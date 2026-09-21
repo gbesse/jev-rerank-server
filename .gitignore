@@ -1,5 +1,7 @@
 # Purpose: Keep dependencies, credentials, caches and local data out of source control.
 node_modules/
+.cache/
+benchmarks/results/*.local.json
 .env
 .env.*
 !.env.example

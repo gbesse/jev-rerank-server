@@ -2,6 +2,19 @@
 
 This file records implementation decisions and validation for each change made with an AI assistant.
 
+## 2026-09-21 — v0.2.0 product completion
+
+- Renamed the distributable package to the available, unscoped `jev-rerank` name and exposed both `jev-rerank` and
+  `jev-rerank-server` commands; prepared public npm provenance publishing and tagged-release packaging.
+- Added a checksum-pinned BEIR SciFact benchmark with deterministic sampling, an in-repo BM25 candidate retriever,
+  candidate-recall ceiling, nDCG/MRR/recall metrics, elapsed time, requests, token usage and estimated cost.
+- Committed the unedited 25-query live result: Jev improved nDCG@10 from 0.616377 to 0.718260 and MRR@10 from
+  0.548159 to 0.685048 at equal 0.84 recall, using 500 calls and an estimated $0.015522.
+- Added an integration smoke that executes `cohere==5.21.1` `ClientV2` against the HTTP service and runs in CI.
+- Locally validated syntax, declarations, 32 unit/integration tests, offline demo, two-call live smoke, the live
+  benchmark, the real Cohere SDK smoke, and package contents. No Docker validation was possible because Docker is not
+  installed on this host. npm publication remains gated by maintainer registry authentication.
+
 ## 2026-09-21 — Initial public alpha
 
 - Purpose: protocol-compatible rerank server backed by Jev (Cohere `/v1/rerank` and `/v2/rerank`, Jina `/v1/rerank`, Voyage `/v1/rerank` shapes) so frameworks with a "rerank base URL" setting can use Jev without code changes.

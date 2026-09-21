@@ -1,9 +1,9 @@
-# jev-rerank-server
+# Jev Rerank
 
 **A drop-in rerank API served by Jev for teams whose RAG stack already has a "rerank base URL" setting.**
 
 [![Tests](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml/badge.svg)](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml)
-[MIT](LICENSE) · Node.js 22+ · No runtime dependencies · Public alpha
+[MIT](LICENSE) · Node.js 22+ · No runtime dependencies · v0.2.0
 
 The server speaks the Cohere `/v1/rerank` and `/v2/rerank`, Jina `/v1/rerank` and Voyage `/v1/rerank` request and
 response shapes. LangChain, LlamaIndex, Haystack, Dify, Open WebUI and any client with a configurable rerank endpoint
@@ -17,11 +17,12 @@ POST /v2/rerank { query, documents, top_n }
    → Cohere/Jina envelope (or Voyage envelope when top_k was sent)
 ```
 
-## Try it in 30 seconds
+## Run it
 
 ```sh
 git clone https://github.com/gbesse/jev-rerank-server.git
 cd jev-rerank-server
+npm ci --ignore-scripts
 npm run demo
 npm test
 ```
@@ -34,7 +35,7 @@ not measured Jev output.
 
 ```sh
 export TYPESAFE_API_KEY=...        # requests are paid and go to https://api.typesafe.ai/v1/systemone
-npx jev-rerank-server --port 8787 --host 127.0.0.1
+npm start -- --port 8787 --host 127.0.0.1
 curl -s http://127.0.0.1:8787/v2/rerank -H 'content-type: application/json' \
   -d '{"query":"How long do I have to return shoes?","documents":["Returns are accepted within 30 days.","Free shipping above 80 euros."],"top_n":1,"return_documents":true}'
 ```
@@ -53,15 +54,34 @@ Docker: `docker compose up` builds `node:24-alpine` with no build step and publi
 The official SDKs (`@typesafe-ai/sdk` on npm, `typesafe-sdk` on PyPI) are an alternative for your own code; this server
 ships its own minimal client so nothing extra is installed.
 
+The release tarball can also be installed without cloning: `npm install -g
+https://github.com/gbesse/jev-rerank-server/releases/download/v0.2.0/jev-rerank-0.2.0.tgz`, then run `jev-rerank`.
+The npm name is reserved in the manifest but registry publication requires maintainer npm authentication.
+
+## Measured on BEIR SciFact
+
+The checked-in v0.2 benchmark uses BM25 to retrieve 20 candidates and Jev pairwise mode only to reorder them. On a
+deterministic 25-query sample, at `k=10`:
+
+| Ranker | nDCG@10 | MRR@10 | Recall@10 |
+| --- | ---: | ---: | ---: |
+| BM25 | 0.616377 | 0.548159 | 0.84 |
+| BM25 → Jev | **0.718260** | **0.685048** | 0.84 |
+
+The live run made 500 Jev requests, consumed 369,576 input tokens, cost an estimated **$0.015522**, and took 16.9
+seconds from this development machine. Candidate recall was 0.84, so the reranker could not recover missing documents.
+This small English scientific-claims sample is evidence, not a universal quality claim. See the
+[complete result](benchmarks/results/scifact-jev-25.json) and [reproduction protocol](benchmarks/README.md).
+
 ## Point your framework at it
 
-See [docs/integrations.md](docs/integrations.md) for LangChain, LlamaIndex, Haystack, Dify and Open WebUI snippets
-(written from public documentation, not executed here) and [docs/protocol.md](docs/protocol.md) for the exact contract.
+See [docs/integrations.md](docs/integrations.md) for the Cohere Python compatibility test plus LangChain, LlamaIndex,
+Haystack, Dify and Open WebUI configuration, and [docs/protocol.md](docs/protocol.md) for the exact contract.
 
 Use it as a library when you want the pipeline without HTTP:
 
 ```js
-import { createJevClient, createRerankServer, rerank } from '@gbesse/jev-rerank-server';
+import { createJevClient, createRerankServer, rerank } from 'jev-rerank';
 
 const provider = createJevClient();                 // reads TYPESAFE_API_KEY
 const response = await rerank({ query, documents, top_n: 5 }, { provider });
@@ -100,8 +120,8 @@ request aborts the others and the call returns 502 rather than a partial ranking
 
 ## Boundaries
 
-- No relevance benchmark was run for this release. TypeSafe's cookbook reports a top-10 accuracy improvement on one
-  legal task with this question design; your corpus will differ. Calibrate on a labeled sample before trusting the order.
+- The checked-in benchmark covers 25 English SciFact queries. It does not establish quality for another language,
+  domain, candidate retriever or chunk size. Run the same harness on labeled examples from your corpus.
 - One document is one Jev question; the score depends on the query and passage only. There is no cross-document
   comparison, no chunking, no semantic embedding fallback.
 - Jev reads instructions literally, counts unreliably and compares numbers and dates poorly. Queries such as "the
@@ -120,10 +140,13 @@ npm run check       # node --check on every .mjs
 npm run typecheck   # tsc --noEmit against docs/public-api-types.mts (needs npm ci --ignore-scripts)
 npm test            # node --test against a fake Jev server on loopback
 npm run demo        # offline synthetic run
+npm run benchmark:offline -- --limit 25
+# pip install cohere==5.21.1 && npm run test:cohere
 ```
 
-CI runs the same four commands on Node 22 and 24. `scripts/live-smoke.mjs` makes at most two paid Jev requests with
-synthetic input when `TYPESAFE_API_KEY` is set and exits non-zero otherwise; it is never run in CI.
+CI runs the core commands on Node 22 and 24 and a separate job runs Cohere Python `ClientV2` against the synthetic
+server. `scripts/live-smoke.mjs` makes at most two paid Jev requests when `TYPESAFE_API_KEY` is set. The live benchmark
+is deliberately manual because it makes paid requests.
 
 ## Related projects
 

@@ -1,6 +1,6 @@
 {
-  "name": "@gbesse/jev-rerank-server",
-  "version": "0.1.0",
+  "name": "jev-rerank",
+  "version": "0.2.0",
   "description": "Drop-in rerank API served by Jev: speaks the Cohere, Jina and Voyage /rerank request and response shapes so existing tools switch by changing a URL.",
   "type": "module",
   "exports": {
@@ -10,6 +10,7 @@
     }
   },
   "bin": {
+    "jev-rerank": "./bin/jev-rerank-server.mjs",
     "jev-rerank-server": "./bin/jev-rerank-server.mjs"
   },
   "files": [
@@ -26,12 +27,20 @@
     "demo": "node examples/demo.mjs",
     "typecheck": "tsc --noEmit --strict --target ES2022 --module NodeNext docs/public-api-types.mts",
     "start": "node bin/jev-rerank-server.mjs",
-    "live-smoke": "node scripts/live-smoke.mjs"
+    "live-smoke": "node scripts/live-smoke.mjs",
+    "benchmark": "node scripts/benchmark-scifact.mjs",
+    "benchmark:offline": "node scripts/benchmark-scifact.mjs --offline",
+    "test:cohere": "node scripts/verify-cohere-python.mjs",
+    "release:check": "npm run check && npm run typecheck && npm test && npm run demo && npm pack --dry-run"
   },
   "engines": {
     "node": ">=22"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/gbesse/jev-rerank-server.git"
@@ -40,6 +49,7 @@
     "url": "https://github.com/gbesse/jev-rerank-server/issues"
   },
   "devDependencies": {
+    "fflate": "^0.8.2",
     "typescript": "5.9.3"
   }
 }
