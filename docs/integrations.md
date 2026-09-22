@@ -4,9 +4,10 @@ description: How to point LangChain, LlamaIndex, Haystack, Dify and Open WebUI a
 
 # Integrations
 
-Start the server first (`TYPESAFE_API_KEY=... npm start -- --port 8787`). The Cohere Python v2 client is executed in CI
-against the real package and the local synthetic server. The framework-specific snippets are contract documentation;
-their full frameworks are not installed in CI. If you set `RERANK_SERVER_TOKEN`, use that value as the client-side API
+Start the server first (`TYPESAFE_API_KEY=... npm start -- --port 8787`). The Cohere Python v2 client and the real
+LangChain and LlamaIndex rerank wrappers are executed in CI against the local synthetic server. See the
+[compatibility test report](framework-compatibility.md) for versions, reproduction and scope.
+If you set `RERANK_SERVER_TOKEN`, use that value as the client-side API
 key; otherwise any non-empty string works because the server ignores it.
 
 The server answers on `/v1/rerank`, `/v2/rerank` and `/rerank`, so both "base URL + `/v1/rerank`" and "base URL +
@@ -23,32 +24,34 @@ response = client.rerank(model="rerank-v3.5", query="How long can I return shoes
 
 `npm run test:cohere` executes this flow with `cohere==5.21.1`; see `integrations/cohere_v2_smoke.py`.
 
-## LangChain (Python, `langchain-cohere`)
+## LangChain (Python, `langchain-cohere==0.6.0`) — executed in CI
 
 ```python
-import cohere
 from langchain_cohere import CohereRerank
 
-# The Cohere SDK accepts a base_url; cohere.Client uses /v1/rerank, cohere.ClientV2 uses /v2/rerank. Both are served.
-client = cohere.Client(api_key="not-used-unless-RERANK_SERVER_TOKEN", base_url="http://127.0.0.1:8787")
-reranker = CohereRerank(client=client, model="jev-1.13.0", top_n=5)
+reranker = CohereRerank(
+    cohere_api_key="not-used-unless-RERANK_SERVER_TOKEN",
+    model="rerank-v3.5", top_n=5, base_url="http://127.0.0.1:8787",
+)
 docs = reranker.compress_documents(documents, query="How long do I have to return shoes?")
 ```
 
-Some `langchain-cohere` versions also accept `CohereRerank(base_url=...)` directly. The underlying Cohere client path is
-tested; this wrapper snippet is not executed in CI.
+This version creates its own Cohere `ClientV2` and sends `/v2/rerank`; no custom client or adapter is needed.
+The synchronous and inherited asynchronous compression methods are tested. If you inject a client explicitly,
+this version requires `cohere.ClientV2`, not the older `cohere.Client`.
 
-## LlamaIndex (Python, `llama-index-postprocessor-cohere-rerank`)
+## LlamaIndex (Python, `llama-index-postprocessor-cohere-rerank==0.10.0`) — wrapper executed in CI
 
 ```python
 from llama_index.postprocessor.cohere_rerank import CohereRerank
 
-reranker = CohereRerank(api_key="not-used-unless-RERANK_SERVER_TOKEN", model="jev-1.13.0", top_n=5, base_url="http://127.0.0.1:8787")
-query_engine = index.as_query_engine(node_postprocessors=[reranker])
+reranker = CohereRerank(api_key="not-used-unless-RERANK_SERVER_TOKEN", model="rerank-v3.5", top_n=5, base_url="http://127.0.0.1:8787")
+reranked_nodes = reranker.postprocess_nodes(nodes, query_str="How long do I have to return shoes?")
 ```
 
-If your version has no `base_url` argument, set the Cohere SDK's `CO_API_URL` environment variable to
-`http://127.0.0.1:8787` before creating the client. Written from public docs, not executed here.
+`nodes` is a list of `NodeWithScore` objects. This version creates its own `ClientV2` and sends `/v2/rerank`.
+The wrapper is tested directly, not a complete index/embedding/query-engine pipeline.
+Both examples retain a Cohere model alias: the server still serves Jev, not the named Cohere model.
 
 ## Haystack (Python, `cohere-haystack`)
 

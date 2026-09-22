@@ -1,0 +1,6 @@
+# Tested wrapper/SDK/core versions. CI also records the complete resolved environment.
+cohere==5.21.1
+langchain-cohere==0.6.0
+langchain-core==1.6.4
+llama-index-postprocessor-cohere-rerank==0.10.0
+llama-index-core==0.14.25
