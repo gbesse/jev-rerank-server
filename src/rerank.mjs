@@ -115,28 +115,40 @@ export function validatePack(pack) {
 export async function scoreDocuments({ provider, query, texts, pack = 1, limiter, signal }) {
   validatePack(pack);
   if (typeof provider !== 'function') throw new TypeError('provider is required');
+  // Retrieval pipelines can return the same chunk more than once (for example through several indexes). Jev's
+  // judgment is a pure function of the query and rendered passage, so score each distinct passage once and fan the
+  // result back out to every original position. This preserves protocol indices while avoiding duplicate paid calls.
+  const uniqueTexts = [];
+  const uniqueIndexByText = new Map();
+  const originalToUnique = texts.map(text => {
+    if (uniqueIndexByText.has(text)) return uniqueIndexByText.get(text);
+    const index = uniqueTexts.length;
+    uniqueIndexByText.set(text, index);
+    uniqueTexts.push(text);
+    return index;
+  });
   const groups = [];
-  for (let start = 0; start < texts.length; start += pack) groups.push(texts.slice(start, start + pack).map((_, offset) => start + offset));
+  for (let start = 0; start < uniqueTexts.length; start += pack) groups.push(uniqueTexts.slice(start, start + pack).map((_, offset) => start + offset));
   const internal = new AbortController();
   const combined = signal ? AbortSignal.any([signal, internal.signal]) : internal.signal;
   const run = limiter ? fn => limiter.run(fn) : fn => fn();
-  const scores = new Array(texts.length).fill(null);
-  const usage = { input_tokens: 0, output_tokens: 0, requests: 0 };
+  const uniqueScores = new Array(uniqueTexts.length).fill(null);
+  const usage = { input_tokens: 0, output_tokens: 0, requests: 0, unique_documents: uniqueTexts.length, deduplicated_documents: texts.length - uniqueTexts.length };
   try {
     await Promise.all(groups.map(group => run(async () => {
       combined.throwIfAborted();
-      const request = pack > 1 ? buildPackedRequest(query, group.map(index => texts[index])) : buildPairwiseRequest(query, texts[group[0]]);
+      const request = pack > 1 ? buildPackedRequest(query, group.map(index => uniqueTexts[index])) : buildPairwiseRequest(query, uniqueTexts[group[0]]);
       const response = await provider({ ...request, signal: combined });
       usage.requests++;
       usage.input_tokens += response.usage.input_tokens;
       usage.output_tokens += response.usage.output_tokens;
-      group.forEach((index, position) => { scores[index] = pack > 1 ? response.answers[`p${position + 1}`].noul : response.answers.relevant.noul; });
+      group.forEach((index, position) => { uniqueScores[index] = pack > 1 ? response.answers[`p${position + 1}`].noul : response.answers.relevant.noul; });
     })));
   } catch (error) {
     internal.abort(error);
     throw error;
   }
-  return { scores, usage };
+  return { scores: originalToUnique.map(index => uniqueScores[index]), usage };
 }
 
 function returnedDocument(document, shape) {
@@ -163,7 +175,7 @@ export function buildRerankResponse(normalized, scores, usage) {
   });
   const estimatedCost = estimateCostUsd(usage.input_tokens);
   if (normalized.shape === 'voyage') {
-    const response = { object: 'list', data: items, model: normalized.model, served_by: JEV_MODEL, usage: { total_tokens: usage.input_tokens + usage.output_tokens, jev_requests: usage.requests, estimated_cost_usd: estimatedCost } };
+    const response = { object: 'list', data: items, model: normalized.model, served_by: JEV_MODEL, usage: { total_tokens: usage.input_tokens + usage.output_tokens, jev_requests: usage.requests, unique_documents: usage.unique_documents, deduplicated_documents: usage.deduplicated_documents, estimated_cost_usd: estimatedCost } };
     if (normalized.warnings.length) response.warnings = normalized.warnings;
     return response;
   }
@@ -172,7 +184,7 @@ export function buildRerankResponse(normalized, scores, usage) {
     results: items,
     model: normalized.model,
     served_by: JEV_MODEL,
-    usage: { total_tokens: usage.input_tokens + usage.output_tokens, prompt_tokens: usage.input_tokens, jev_requests: usage.requests, estimated_cost_usd: estimatedCost },
+    usage: { total_tokens: usage.input_tokens + usage.output_tokens, prompt_tokens: usage.input_tokens, jev_requests: usage.requests, unique_documents: usage.unique_documents, deduplicated_documents: usage.deduplicated_documents, estimated_cost_usd: estimatedCost },
     meta: { api_version: { version: '2' }, billed_units: { search_units: 1 } },
   };
   if (normalized.warnings.length) response.meta.warnings = normalized.warnings;
@@ -182,7 +194,7 @@ export function buildRerankResponse(normalized, scores, usage) {
 /** Full pipeline for one request body: validate, score, shape. Throws `RerankValidationError` or the provider's error. */
 export async function rerank(body, { provider, pack = 1, limiter, signal } = {}) {
   const normalized = normalizeRerankRequest(body);
-  if (normalized.documents.length === 0) return buildRerankResponse(normalized, [], { input_tokens: 0, output_tokens: 0, requests: 0 });
+  if (normalized.documents.length === 0) return buildRerankResponse(normalized, [], { input_tokens: 0, output_tokens: 0, requests: 0, unique_documents: 0, deduplicated_documents: 0 });
   const { scores, usage } = await scoreDocuments({ provider, query: normalized.query, texts: normalized.documents.map(document => document.text), pack, limiter, signal });
   return buildRerankResponse(normalized, scores, usage);
 }

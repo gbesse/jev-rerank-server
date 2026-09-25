@@ -2,6 +2,14 @@
 
 This file records implementation decisions and validation for each change made with an AI assistant.
 
+## 2026-09-25 — v0.3.0 duplicate-call elimination
+
+- Score identical rendered passages only once per request, including in packed mode, while preserving every original
+  document index and deterministic tie ordering.
+- Expose `unique_documents` and `deduplicated_documents` in usage so operators can audit the calls and cost avoided.
+- Added focused pairwise and packed regression coverage and updated the public TypeScript contract.
+- Upgraded the benchmark archive reader to the patched `fflate` release; `npm audit` reports no vulnerabilities.
+
 ## 2026-09-21 — v0.2.0 product completion
 
 - Renamed the distributable package to the available, unscoped `jev-rerank` name and exposed both `jev-rerank` and
