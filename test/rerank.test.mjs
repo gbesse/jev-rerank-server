@@ -56,6 +56,33 @@ test('rerank sorts by score, keeps original indices, applies top_n and returns d
   assert.equal(result.usage.prompt_tokens, 150);
 });
 
+test('identical rendered documents are scored once while every original index is preserved', async () => {
+  let calls = 0;
+  const counting = async request => { calls++; return provider(request); };
+  const result = await rerank({
+    query: 'capital of France',
+    documents: ['Paris is the capital of France', 'nothing here', 'Paris is the capital of France'],
+    return_documents: true,
+  }, { provider: counting });
+  assert.equal(calls, 2);
+  assert.deepEqual(result.results.map(item => item.index), [0, 2, 1]);
+  assert.equal(result.results[0].relevance_score, result.results[1].relevance_score);
+  assert.equal(result.usage.jev_requests, 2);
+  assert.equal(result.usage.unique_documents, 2);
+  assert.equal(result.usage.deduplicated_documents, 1);
+  assert.equal(result.usage.prompt_tokens, 100);
+});
+
+test('deduplication composes with packed mode', async () => {
+  let calls = 0;
+  const counting = async request => { calls++; return provider(request); };
+  const result = await rerank({ query: 'red', documents: ['red', 'blue', 'red', 'green'] }, { provider: counting, pack: 2 });
+  assert.equal(calls, 2);
+  assert.deepEqual(result.results.map(item => item.index), [0, 2, 1, 3]);
+  assert.equal(result.usage.unique_documents, 3);
+  assert.equal(result.usage.deduplicated_documents, 1);
+});
+
 test('object documents are returned as the original object in the Cohere shape', async () => {
   const result = await rerank({ query: 'red', documents: [{ title: 'red shoes', sku: 'A' }], return_documents: true }, { provider });
   assert.deepEqual(result.results[0].document, { title: 'red shoes', sku: 'A' });

@@ -94,7 +94,7 @@ export interface NormalizedRerankRequest {
   warnings: string[];
 }
 export interface RerankResult { index: number; relevance_score: number; document?: RerankDocument; truncated?: true }
-export interface RerankUsage { total_tokens: number; jev_requests: number; estimated_cost_usd: number }
+export interface RerankUsage { total_tokens: number; jev_requests: number; unique_documents: number; deduplicated_documents: number; estimated_cost_usd: number }
 export interface CohereRerankResponse {
   id: string;
   results: RerankResult[];
@@ -110,9 +110,10 @@ export function normalizeRerankRequest(body: unknown): NormalizedRerankRequest;
 export function buildPairwiseRequest(query: string, passage: string): { state: { query: string; passage: string }; questions: Record<'relevant', Question> };
 export function buildPackedRequest(query: string, passages: string[]): { state: { query: string; passages: Record<string, string> }; questions: Record<string, Question> };
 export function validatePack(pack: number): number;
-export function scoreDocuments(options: { provider: JevProvider; query: string; texts: string[]; pack?: number; limiter?: Limiter; signal?: AbortSignal }): Promise<{ scores: number[]; usage: JevUsage & { requests: number } }>;
+export interface ScoreUsage extends JevUsage { requests: number; unique_documents: number; deduplicated_documents: number }
+export function scoreDocuments(options: { provider: JevProvider; query: string; texts: string[]; pack?: number; limiter?: Limiter; signal?: AbortSignal }): Promise<{ scores: number[]; usage: ScoreUsage }>;
 export function rankResults(documents: NormalizedDocument[], scores: number[]): { index: number; relevance_score: number; truncated: boolean }[];
-export function buildRerankResponse(normalized: NormalizedRerankRequest, scores: number[], usage: JevUsage & { requests: number }): RerankResponse;
+export function buildRerankResponse(normalized: NormalizedRerankRequest, scores: number[], usage: ScoreUsage): RerankResponse;
 export function rerank(body: unknown, options: { provider: JevProvider; pack?: number; limiter?: Limiter; signal?: AbortSignal }): Promise<RerankResponse>;
 
 export function syntheticRelevance(query: string, passage: string): number;
