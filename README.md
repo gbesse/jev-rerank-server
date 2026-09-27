@@ -144,10 +144,13 @@ npm test            # node --test against a fake Jev server on loopback
 npm run demo        # offline synthetic run
 npm run benchmark:offline -- --limit 25
 # pip install cohere==5.21.1 && npm run test:cohere
+# pip install -r integrations/requirements-frameworks.txt && npm run test:frameworks
 ```
 
-CI runs the core commands on Node 22 and 24 and a separate job runs Cohere Python `ClientV2` against the synthetic
-server. `scripts/live-smoke.mjs` makes at most two paid Jev requests when `TYPESAFE_API_KEY` is set. The live benchmark
+CI runs the core commands on Node 22 and 24, Cohere Python `ClientV2`, and **13 real LangChain/LlamaIndex wrapper tests**
+against the synthetic server on Python 3.11/3.12. See [versions, results and reproduction](docs/framework-compatibility.md).
+These are protocol tests, not a live model-quality benchmark.
+`scripts/live-smoke.mjs` makes at most two paid Jev requests when `TYPESAFE_API_KEY` is set. The live benchmark
 is deliberately manual because it makes paid requests.
 
 ## Related projects

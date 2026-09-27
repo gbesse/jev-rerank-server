@@ -32,3 +32,19 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: pip install 'cohere==5.21.1'
       - run: npm run test:cohere
+  framework-python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -r integrations/requirements-frameworks.txt
+      - run: pip freeze
+      - run: npm run test:frameworks
