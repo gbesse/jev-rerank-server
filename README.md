@@ -3,7 +3,7 @@
 **A drop-in rerank API served by Jev for teams whose RAG stack already has a "rerank base URL" setting.**
 
 [![Tests](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml/badge.svg)](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml)
-[MIT](LICENSE) · Node.js 22+ · No runtime dependencies · v0.2.0
+[MIT](LICENSE) · Node.js 22+ · No runtime dependencies · v0.3.0
 
 The server speaks the Cohere `/v1/rerank` and `/v2/rerank`, Jina `/v1/rerank` and Voyage `/v1/rerank` request and
 response shapes. LangChain, LlamaIndex, Haystack, Dify, Open WebUI and any client with a configurable rerank endpoint
@@ -47,6 +47,8 @@ Options: `--pack N` (passages per Jev request, default 1), `--token TOKEN` (bear
 Every response reports `usage.total_tokens`, `usage.jev_requests` and `usage.estimated_cost_usd`
 (`input_tokens × 0.042 / 1e6`, an estimate from the published price list, not a bill). With the default pairwise mode,
 reranking 20 documents of about 500 characters costs roughly 20 × 180 tokens ≈ 3,600 tokens ≈ USD 0.00015.
+Identical rendered documents inside one request are evaluated once; `usage.unique_documents` and
+`usage.deduplicated_documents` make the saved calls explicit while results retain every original index.
 
 Docker: `docker compose up` builds `node:24-alpine` with no build step and publishes `127.0.0.1:8787`; set
 `TYPESAFE_API_KEY` in the host environment first.
@@ -55,7 +57,7 @@ The official SDKs (`@typesafe-ai/sdk` on npm, `typesafe-sdk` on PyPI) are an alt
 ships its own minimal client so nothing extra is installed.
 
 The release tarball can also be installed without cloning: `npm install -g
-https://github.com/gbesse/jev-rerank-server/releases/download/v0.2.0/jev-rerank-0.2.0.tgz`, then run `jev-rerank`.
+https://github.com/gbesse/jev-rerank-server/releases/download/v0.3.0/jev-rerank-0.3.0.tgz`, then run `jev-rerank`.
 The npm name is reserved in the manifest but registry publication requires maintainer npm authentication.
 
 ## Measured on BEIR SciFact

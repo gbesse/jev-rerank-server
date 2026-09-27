@@ -169,7 +169,14 @@ test('usage aggregates Jev input tokens and the estimated cost follows the price
   const { app, close } = await setup({ jev: { inputTokensPerRequest: 100 } });
   try {
     const { body } = await postJson(`${app.url}/v2/rerank`, { query, documents: docs });
-    assert.deepEqual(body.usage, { total_tokens: 300, prompt_tokens: 300, jev_requests: 3, estimated_cost_usd: 0.0000126 });
+    assert.deepEqual(body.usage, {
+      total_tokens: 300,
+      prompt_tokens: 300,
+      jev_requests: 3,
+      unique_documents: 3,
+      deduplicated_documents: 0,
+      estimated_cost_usd: 0.0000126,
+    });
     assert.equal(INPUT_USD_PER_MILLION_TOKENS, 0.042);
   } finally { await close(); }
 });
