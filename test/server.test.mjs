@@ -1,7 +1,7 @@
 // Purpose: End-to-end protocol tests through the HTTP server against a fake Jev on loopback.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createJevClient, createRerankServer, createLimiter, INPUT_USD_PER_MILLION_TOKENS } from '../src/index.mjs';
+import { createJevClient, createRerankServer, createLimiter, createScoreCache, INPUT_USD_PER_MILLION_TOKENS } from '../src/index.mjs';
 import { startFakeJev, startServer, postJson } from './fake-jev.mjs';
 
 const KEY = 'sk-test-secret-never-leaked';
@@ -111,7 +111,7 @@ test('server token is enforced on rerank routes and not on probes', async () => 
     assert.equal(res.status, 200);
     const health = await fetch(`${app.url}/healthz`, { signal: AbortSignal.timeout(5000) });
     assert.equal(health.status, 200);
-    assert.deepEqual(await health.json(), { ok: true, model: 'jev-1.13.0', pack: 1 });
+    assert.deepEqual(await health.json(), { ok: true, model: 'jev-1.13.0', pack: 1, cache: { enabled: false } });
   } finally { await close(); }
 });
 
@@ -165,6 +165,23 @@ test('packed mode groups 7 documents into 3 requests with N=3', async () => {
   } finally { await close(); }
 });
 
+test('server cache is visible in health and makes an identical HTTP request free', async () => {
+  const cache = createScoreCache({ ttlMs: 60_000, maxEntries: 10 });
+  const { fake, app, close } = await setup({ server: { cache } });
+  try {
+    const request = { query, documents: docs.slice(0, 2) };
+    const first = await postJson(`${app.url}/v2/rerank`, request);
+    const second = await postJson(`${app.url}/v2/rerank`, request);
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(fake.requests.length, 2);
+    assert.equal(second.body.usage.jev_requests, 0);
+    assert.equal(second.body.usage.cached_documents, 2);
+    const health = await (await fetch(`${app.url}/healthz`)).json();
+    assert.deepEqual(health.cache, { enabled: true, ttl_ms: 60_000, max_entries: 10, entries: 2 });
+  } finally { await close(); }
+});
+
 test('usage aggregates Jev input tokens and the estimated cost follows the price list', async () => {
   const { app, close } = await setup({ jev: { inputTokensPerRequest: 100 } });
   try {
@@ -175,6 +192,8 @@ test('usage aggregates Jev input tokens and the estimated cost follows the price
       jev_requests: 3,
       unique_documents: 3,
       deduplicated_documents: 0,
+      cached_documents: 0,
+      scored_documents: 3,
       estimated_cost_usd: 0.0000126,
     });
     assert.equal(INPUT_USD_PER_MILLION_TOKENS, 0.042);

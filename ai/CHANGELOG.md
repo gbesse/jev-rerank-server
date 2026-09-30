@@ -2,6 +2,17 @@
 
 This file records implementation decisions and validation for each change made with an AI assistant.
 
+## 2026-09-30 — v0.4.0 exact cross-request cache
+
+- Added an opt-in, bounded in-memory LRU/TTL cache for exact `(query, rendered document)` scores. It is disabled by
+  default, never caches failed partial requests and is cleared on restart.
+- Added CLI/environment controls, Docker Compose wiring, health visibility and usage counters separating cache hits,
+  within-request deduplication and documents actually scored by Jev.
+- Added expiry, eviction, failure-atomicity and complete HTTP regressions; an identical second request makes zero Jev
+  calls and reports zero tokens/cost.
+- Verified the exact path against the live pinned model with one public factual passage: the first evaluation used one
+  request and the immediate repeat returned the same 0.99 score with zero requests, tokens and estimated cost.
+
 ## 2026-09-25 — v0.3.0 duplicate-call elimination
 
 - Score identical rendered passages only once per request, including in packed mode, while preserving every original

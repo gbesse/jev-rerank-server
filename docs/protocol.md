@@ -11,7 +11,7 @@ description: Exact HTTP contract of jev-rerank-server: routes, accepted request 
 | `POST` | `/v1/rerank` | Cohere v1, Jina and Voyage clients |
 | `POST` | `/v2/rerank` | Cohere v2 clients |
 | `POST` | `/rerank` | Alias for tools that append `/rerank` to a base URL |
-| `GET` | `/healthz` | `{ ok: true, model: "jev-1.13.0", pack: N }`, no token needed |
+| `GET` | `/healthz` | Model, pack and optional exact-cache status, no token needed |
 | `GET` | `/v1/models` | Pinned model and accepted aliases, no token needed |
 
 All three rerank routes run the same code. Bodies are JSON; responses are JSON with `content-type: application/json`.
@@ -48,7 +48,7 @@ Cohere/Jina (no `top_k` in the request):
   "results": [{ "index": 2, "relevance_score": 0.91, "document": { "text": "..." }, "truncated": true }],
   "model": "rerank-v3.5",
   "served_by": "jev-1.13.0",
-  "usage": { "total_tokens": 360, "prompt_tokens": 360, "jev_requests": 3, "estimated_cost_usd": 0.00001512 },
+  "usage": { "total_tokens": 360, "prompt_tokens": 360, "jev_requests": 3, "unique_documents": 3, "deduplicated_documents": 0, "cached_documents": 0, "scored_documents": 3, "estimated_cost_usd": 0.00001512 },
   "meta": { "api_version": { "version": "2" }, "billed_units": { "search_units": 1 }, "warnings": ["..."] }
 }
 ```
@@ -64,13 +64,15 @@ Voyage (`top_k` present):
   "data": [{ "index": 2, "relevance_score": 0.91, "document": "..." }],
   "model": "rerank-2",
   "served_by": "jev-1.13.0",
-  "usage": { "total_tokens": 360, "jev_requests": 3, "estimated_cost_usd": 0.00001512 }
+  "usage": { "total_tokens": 360, "jev_requests": 3, "unique_documents": 3, "deduplicated_documents": 0, "cached_documents": 0, "scored_documents": 3, "estimated_cost_usd": 0.00001512 }
 }
 ```
 
 Results are sorted by `relevance_score` descending; ties keep the original document order. `total_tokens` sums Jev
 `input_tokens` and `output_tokens` over every request made for the call; `estimated_cost_usd` is `input_tokens × 0.042 / 1e6`
-from the published price list, rounded to nanodollars, and is an estimate rather than a bill.
+from the published price list, rounded to nanodollars, and is an estimate rather than a bill. With the optional exact
+cache enabled, `cached_documents` counts distinct rendered documents reused across calls and `scored_documents` counts
+the distinct misses sent to Jev. Repeated documents inside the same request remain visible in `deduplicated_documents`.
 
 ## Errors
 

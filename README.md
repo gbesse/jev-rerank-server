@@ -3,7 +3,7 @@
 **A drop-in rerank API served by Jev for teams whose RAG stack already has a "rerank base URL" setting.**
 
 [![Tests](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml/badge.svg)](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml)
-[MIT](LICENSE) · Node.js 22+ · No runtime dependencies · v0.3.0
+[MIT](LICENSE) · Node.js 22+ · No runtime dependencies · v0.4.0
 
 The server speaks the Cohere `/v1/rerank` and `/v2/rerank`, Jina `/v1/rerank` and Voyage `/v1/rerank` request and
 response shapes. LangChain, LlamaIndex, Haystack, Dify, Open WebUI and any client with a configurable rerank endpoint
@@ -40,15 +40,23 @@ curl -s http://127.0.0.1:8787/v2/rerank -H 'content-type: application/json' \
   -d '{"query":"How long do I have to return shoes?","documents":["Returns are accepted within 30 days.","Free shipping above 80 euros."],"top_n":1,"return_documents":true}'
 ```
 
-Options: `--pack N` (passages per Jev request, default 1), `--token TOKEN` (bearer clients must send). Environment:
+Options: `--pack N` (passages per Jev request, default 1), `--token TOKEN` (bearer clients must send),
+`--cache-ttl SECONDS` and `--cache-max-entries N`. Environment:
 `TYPESAFE_API_KEY` (required), `RERANK_SERVER_TOKEN`, `JEV_RERANK_PACK`, `JEV_CONCURRENCY` (default 8),
-`JEV_REQUESTS_PER_MINUTE` (default 1,000), `JEV_ENDPOINT` (HTTPS only, loopback HTTP for tests).
+`JEV_REQUESTS_PER_MINUTE` (default 1,000), `JEV_CACHE_TTL_SECONDS` (default 0/off),
+`JEV_CACHE_MAX_ENTRIES` (default 5,000), `JEV_ENDPOINT` (HTTPS only, loopback HTTP for tests).
 
 Every response reports `usage.total_tokens`, `usage.jev_requests` and `usage.estimated_cost_usd`
 (`input_tokens × 0.042 / 1e6`, an estimate from the published price list, not a bill). With the default pairwise mode,
 reranking 20 documents of about 500 characters costs roughly 20 × 180 tokens ≈ 3,600 tokens ≈ USD 0.00015.
 Identical rendered documents inside one request are evaluated once; `usage.unique_documents` and
 `usage.deduplicated_documents` make the saved calls explicit while results retain every original index.
+
+For repeated retrieval traffic, opt into the bounded process-local exact cache with `--cache-ttl 300`. A second
+identical `(query, rendered document)` pair then reuses its score and reports it in `usage.cached_documents`; only
+misses count in `usage.scored_documents`, `jev_requests`, tokens and estimated cost. Entries expire without sliding
+their TTL, least-recently-used entries are evicted at the configured bound, failures are never cached, and restarting
+the process clears everything. The cache is off by default because even a pinned model can change operationally.
 
 Docker: `docker compose up` builds `node:24-alpine` with no build step and publishes `127.0.0.1:8787`; set
 `TYPESAFE_API_KEY` in the host environment first.
@@ -57,7 +65,7 @@ The official SDKs (`@typesafe-ai/sdk` on npm, `typesafe-sdk` on PyPI) are an alt
 ships its own minimal client so nothing extra is installed.
 
 The release tarball can also be installed without cloning: `npm install -g
-https://github.com/gbesse/jev-rerank-server/releases/download/v0.3.0/jev-rerank-0.3.0.tgz`, then run `jev-rerank`.
+https://github.com/gbesse/jev-rerank-server/releases/download/v0.4.0/jev-rerank-0.4.0.tgz`, then run `jev-rerank`.
 The npm name is reserved in the manifest but registry publication requires maintainer npm authentication.
 
 ## Measured on BEIR SciFact
@@ -119,6 +127,9 @@ a query over 4,000 characters is a 400; `max_chunks_per_doc` is ignored with a w
 tokens are refused before sending. Jev calls run through an in-process limiter (8 concurrent, 1,000 requests per
 minute) and retry only on 429, 529 and network errors with jittered backoff, honouring `retry-after`. One failed
 request aborts the others and the call returns 502 rather than a partial ranking.
+
+`GET /healthz` reports the pinned model, pack size and cache configuration/current entry count. It never calls Jev and
+remains unauthenticated for container probes.
 
 ## Boundaries
 
