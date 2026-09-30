@@ -60,14 +60,14 @@ export function describeError(error) {
  * Build the server. `provider` is any Jev-contract provider (real client or fake); `token`, when set, is required as
  * `Authorization: Bearer` (or `X-API-Key`) on rerank calls. `/healthz` and `/v1/models` stay open so probes work.
  */
-export function createRerankServer({ provider, token = null, pack = 1, limiter = createLimiter(), log = message => console.error(message), maxBodyBytes = DEFAULT_MAX_BODY_BYTES } = {}) {
+export function createRerankServer({ provider, token = null, pack = 1, limiter = createLimiter(), cache, log = message => console.error(message), maxBodyBytes = DEFAULT_MAX_BODY_BYTES } = {}) {
   if (typeof provider !== 'function') throw new TypeError('provider is required');
   if (token !== null && (typeof token !== 'string' || token.length === 0)) throw new TypeError('token must be a non-empty string or null');
   validatePack(pack);
 
   async function handle(request, response) {
     const url = new URL(request.url, 'http://localhost');
-    if (request.method === 'GET' && url.pathname === '/healthz') return send(response, 200, { ok: true, model: JEV_MODEL, pack });
+    if (request.method === 'GET' && url.pathname === '/healthz') return send(response, 200, { ok: true, model: JEV_MODEL, pack, cache: cache ? { enabled: true, ttl_ms: cache.ttlMs, max_entries: cache.maxEntries, entries: cache.size } : { enabled: false } });
     if (request.method === 'GET' && url.pathname === '/v1/models') {
       return send(response, 200, {
         object: 'list',
@@ -79,7 +79,7 @@ export function createRerankServer({ provider, token = null, pack = 1, limiter =
     if (request.method !== 'POST') return send(response, 405, { message: 'Use POST' });
     if (token !== null && !tokenMatches(presentedToken(request), token)) return send(response, 401, { message: 'Missing or invalid bearer token' });
     const body = await readJsonBody(request, maxBodyBytes);
-    const result = await rerank(body, { provider, pack, limiter });
+    const result = await rerank(body, { provider, pack, limiter, cache });
     send(response, 200, result);
   }
 

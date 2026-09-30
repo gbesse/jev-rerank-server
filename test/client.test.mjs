@@ -106,9 +106,12 @@ test('limiter enforces the sliding-window rate with an injected clock', async ()
 });
 
 test('CLI parses flags and environment, prints help, and refuses to serve without a key', async () => {
-  assert.deepEqual(parseArgs(['--port', '9000', '--pack', '4', '--token', 't'], {}), { port: 9000, host: '127.0.0.1', pack: 4, token: 't', help: false });
+  assert.deepEqual(parseArgs(['--port', '9000', '--pack', '4', '--token', 't'], {}), { port: 9000, host: '127.0.0.1', pack: 4, token: 't', cacheTtl: 0, cacheMaxEntries: 5000, help: false });
   assert.equal(parseArgs([], { JEV_RERANK_PACK: '2', RERANK_SERVER_TOKEN: 'env' }).pack, 2);
+  assert.equal(parseArgs(['--cache-ttl', '300', '--cache-max-entries', '200'], {}).cacheTtl, 300);
+  assert.equal(parseArgs([], { JEV_CACHE_TTL_SECONDS: '45' }).cacheTtl, 45);
   assert.throws(() => parseArgs(['--pack', '99'], {}), /--pack must be/);
+  assert.throws(() => parseArgs(['--cache-ttl', '-1'], {}), /--cache-ttl/);
   assert.throws(() => parseArgs(['--bogus'], {}), /Unknown argument/);
   const bin = new URL('../bin/jev-rerank-server.mjs', import.meta.url).pathname;
   const help = await run(process.execPath, [bin, '--help'], { env: { ...process.env, TYPESAFE_API_KEY: '' } });

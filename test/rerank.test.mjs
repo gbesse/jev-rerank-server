@@ -1,7 +1,7 @@
 // Purpose: Unit tests for request normalization, ordering, packing and response shaping without HTTP.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeRerankRequest, rerank, buildPackedRequest, buildPairwiseRequest, scoreDocuments, createSyntheticRerankProvider, syntheticRelevance, RELEVANCE_INSTRUCTIONS, RELEVANCE_CRITERIA, RerankValidationError, validatePack } from '../src/index.mjs';
+import { normalizeRerankRequest, rerank, buildPackedRequest, buildPairwiseRequest, scoreDocuments, createScoreCache, createSyntheticRerankProvider, syntheticRelevance, RELEVANCE_INSTRUCTIONS, RELEVANCE_CRITERIA, RerankValidationError, validatePack } from '../src/index.mjs';
 
 const provider = createSyntheticRerankProvider({ inputTokensPerRequest: 50 });
 
@@ -81,6 +81,37 @@ test('deduplication composes with packed mode', async () => {
   assert.deepEqual(result.results.map(item => item.index), [0, 2, 1, 3]);
   assert.equal(result.usage.unique_documents, 3);
   assert.equal(result.usage.deduplicated_documents, 1);
+});
+
+test('exact score cache avoids repeated provider calls, expires and evicts least-recently-used entries', async () => {
+  let clock = 1000, calls = 0;
+  const cache = createScoreCache({ ttlMs: 100, maxEntries: 2, now: () => clock });
+  const counting = async request => { calls++; return provider(request); };
+  const body = { query: 'capital of France', documents: ['Paris is the capital of France', 'nothing here'] };
+  const first = await rerank(body, { provider: counting, cache });
+  const second = await rerank(body, { provider: counting, cache });
+  assert.equal(calls, 2);
+  assert.deepEqual(second.results, first.results.map(({ index, relevance_score }) => ({ index, relevance_score })));
+  assert.equal(second.usage.jev_requests, 0);
+  assert.equal(second.usage.cached_documents, 2);
+  assert.equal(second.usage.scored_documents, 0);
+  assert.equal(second.usage.total_tokens, 0);
+  cache.get(body.query, body.documents[0]); // Paris is now most recently used.
+  cache.set('q2', 'd2', 0.2); // Evicts "nothing here".
+  assert.equal(cache.get(body.query, body.documents[1]), undefined);
+  clock += 101;
+  assert.equal(cache.get(body.query, body.documents[0]), undefined);
+  assert.throws(() => createScoreCache({ ttlMs: 0 }), /ttlMs/);
+});
+
+test('failed multi-group requests do not warm the shared score cache', async () => {
+  const cache = createScoreCache();
+  const failing = async request => {
+    if (request.state.passage === 'boom') throw new Error('provider exploded');
+    return provider(request);
+  };
+  await assert.rejects(rerank({ query: 'q', documents: ['safe', 'boom'] }, { provider: failing, cache }), /provider exploded/);
+  assert.equal(cache.size, 0);
 });
 
 test('object documents are returned as the original object in the Cohere shape', async () => {
