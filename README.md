@@ -3,7 +3,7 @@
 **A drop-in rerank API served by Jev for teams whose RAG stack already has a "rerank base URL" setting.**
 
 [![Tests](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml/badge.svg)](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml)
-[MIT](LICENSE) · Node.js 22+ · No runtime dependencies · v0.4.0
+[MIT](LICENSE) · Node.js 22+ · No runtime dependencies · v0.4.1
 
 The server speaks the Cohere `/v1/rerank` and `/v2/rerank`, Jina `/v1/rerank` and Voyage `/v1/rerank` request and
 response shapes. LangChain, LlamaIndex, Haystack, Dify, Open WebUI and any client with a configurable rerank endpoint
@@ -30,6 +30,8 @@ npm test
 The demo starts the server on loopback with a synthetic provider and sends Cohere-, Jina- and Voyage-shaped requests.
 No key, install or build is required. The demo and test scores are synthetic (share of query words found in the passage),
 not measured Jev output.
+
+To see how duplicate documents and an exact score cache affect request counts, run `node examples/cache-savings.mjs`. It reranks the same fictional return-policy documents twice, then changes the query; the printed `jev_requests` and `cached_documents` are from a local synthetic provider, never the paid API.
 
 ## Call real Jev
 
@@ -65,7 +67,7 @@ The official SDKs (`@typesafe-ai/sdk` on npm, `typesafe-sdk` on PyPI) are an alt
 ships its own minimal client so nothing extra is installed.
 
 The release tarball can also be installed without cloning: `npm install -g
-https://github.com/gbesse/jev-rerank-server/releases/download/v0.4.0/jev-rerank-0.4.0.tgz`, then run `jev-rerank`.
+https://github.com/gbesse/jev-rerank-server/releases/download/v0.4.1/jev-rerank-0.4.1.tgz`, then run `jev-rerank`.
 The npm name is reserved in the manifest but registry publication requires maintainer npm authentication.
 
 ## Measured on BEIR SciFact
