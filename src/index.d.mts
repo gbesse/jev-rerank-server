@@ -104,6 +104,13 @@ export interface NormalizedRerankRequest {
 }
 export interface RerankResult { index: number; relevance_score: number; document?: RerankDocument; truncated?: true }
 export interface RerankUsage { total_tokens: number; jev_requests: number; unique_documents: number; deduplicated_documents: number; cached_documents: number; scored_documents: number; estimated_cost_usd: number }
+export interface RerankMetrics {
+  begin(): void;
+  finish(result: { status: number; durationSeconds: number; usage?: RerankUsage | null; documents?: number }): void;
+  snapshot(): { requests: number; inFlight: number; durationSeconds: number; documents: number; uniqueDocuments: number; deduplicatedDocuments: number; cachedDocuments: number; scoredDocuments: number; jevRequests: number; tokens: number; estimatedCostUsd: number; statuses: Record<string, number> };
+  render(): string;
+}
+export function createMetrics(): RerankMetrics;
 export interface CohereRerankResponse {
   id: string;
   results: RerankResult[];
@@ -135,6 +142,7 @@ export interface RerankServerOptions {
   pack?: number;
   limiter?: Limiter;
   cache?: ScoreCache;
+  metrics?: RerankMetrics;
   log?: (message: string) => void;
   maxBodyBytes?: number;
 }
