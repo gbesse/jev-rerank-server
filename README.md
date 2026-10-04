@@ -131,7 +131,9 @@ minute) and retry only on 429, 529 and network errors with jittered backoff, hon
 request aborts the others and the call returns 502 rather than a partial ranking.
 
 `GET /healthz` reports the pinned model, pack size and cache configuration/current entry count. It never calls Jev and
-remains unauthenticated for container probes.
+remains unauthenticated for container probes. `GET /metrics` exposes process-local Prometheus counters for response
+classes, latency, documents, cache savings, Jev calls, tokens and estimated cost. It never contains query or document
+content. When `RERANK_SERVER_TOKEN` is configured, `/metrics` requires the same bearer token; `/healthz` stays open.
 
 ## Boundaries
 

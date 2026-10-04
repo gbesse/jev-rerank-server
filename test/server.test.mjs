@@ -112,6 +112,8 @@ test('server token is enforced on rerank routes and not on probes', async () => 
     const health = await fetch(`${app.url}/healthz`, { signal: AbortSignal.timeout(5000) });
     assert.equal(health.status, 200);
     assert.deepEqual(await health.json(), { ok: true, model: 'jev-1.13.0', pack: 1, cache: { enabled: false } });
+    assert.equal((await fetch(`${app.url}/metrics`)).status, 401);
+    assert.equal((await fetch(`${app.url}/metrics`, { headers: { authorization: 'Bearer client-token' } })).status, 200);
   } finally { await close(); }
 });
 
@@ -179,6 +181,27 @@ test('server cache is visible in health and makes an identical HTTP request free
     assert.equal(second.body.usage.cached_documents, 2);
     const health = await (await fetch(`${app.url}/healthz`)).json();
     assert.deepEqual(health.cache, { enabled: true, ttl_ms: 60_000, max_entries: 10, entries: 2 });
+    const metrics = await (await fetch(`${app.url}/metrics`)).text();
+    assert.match(metrics, /jev_rerank_http_requests_total 2/);
+    assert.match(metrics, /jev_rerank_http_responses_total\{status="2xx"\} 2/);
+    assert.match(metrics, /jev_rerank_documents_total 4/);
+    assert.match(metrics, /jev_rerank_cached_documents_total 2/);
+    assert.match(metrics, /jev_rerank_scored_documents_total 2/);
+    assert.match(metrics, /jev_rerank_jev_requests_total 2/);
+    assert.match(metrics, /jev_rerank_tokens_total 200/);
+    assert.doesNotMatch(metrics, /capital of France/);
+  } finally { await close(); }
+});
+
+test('/metrics counts failed reranks without recording request content', async () => {
+  const { app, close } = await setup();
+  try {
+    await postJson(`${app.url}/v2/rerank`, { documents: docs });
+    const metrics = await (await fetch(`${app.url}/metrics`)).text();
+    assert.match(metrics, /jev_rerank_http_requests_total 1/);
+    assert.match(metrics, /jev_rerank_http_responses_total\{status="4xx"\} 1/);
+    assert.match(metrics, /jev_rerank_documents_total 0/);
+    assert.doesNotMatch(metrics, /Paris|capital/);
   } finally { await close(); }
 });
 
