@@ -13,6 +13,7 @@ const scenarios = [
   ['first request', firstQuery],
   ['same request again', firstQuery],
   ['changed query', 'When is shipping free?'],
+  ['original query after another query', firstQuery],
 ];
 
 console.log('Synthetic relevance on fictional documents; no Jev API call.');

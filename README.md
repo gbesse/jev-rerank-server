@@ -3,7 +3,7 @@
 **A drop-in rerank API served by Jev for teams whose RAG stack already has a "rerank base URL" setting.**
 
 [![Tests](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml/badge.svg)](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml)
-[MIT](LICENSE) · Node.js 22+ · No runtime dependencies · v0.4.1
+[MIT](LICENSE) · Node.js 22+ · No runtime dependencies · v0.5.1
 
 The server speaks the Cohere `/v1/rerank` and `/v2/rerank`, Jina `/v1/rerank` and Voyage `/v1/rerank` request and
 response shapes. LangChain, LlamaIndex, Haystack, Dify, Open WebUI and any client with a configurable rerank endpoint
@@ -67,7 +67,7 @@ The official SDKs (`@typesafe-ai/sdk` on npm, `typesafe-sdk` on PyPI) are an alt
 ships its own minimal client so nothing extra is installed.
 
 The release tarball can also be installed without cloning: `npm install -g
-https://github.com/gbesse/jev-rerank-server/releases/download/v0.4.1/jev-rerank-0.4.1.tgz`, then run `jev-rerank`.
+https://github.com/gbesse/jev-rerank-server/releases/download/v0.5.1/jev-rerank-0.5.1.tgz`, then run `jev-rerank`.
 The npm name is reserved in the manifest but registry publication requires maintainer npm authentication.
 
 ## Measured on BEIR SciFact
@@ -106,6 +106,8 @@ Errors propagate: a failed Jev call rejects `rerank()` and yields an HTTP 502 wi
 use `createSyntheticRerankProvider()` or `createFakeProvider(fixtures)`, which never touch the network.
 
 ## How it decides
+
+Run `node examples/cache-savings.mjs` to compare a first query, a repeated query, a changed query and a return to the first query. The synthetic demo reports requests, duplicate documents and cache hits; changing the query must not reuse the previous query's scores. / La démonstration distingue les requêtes et les résultats en cache sans appel Jev. / La demostración distingue las consultas y los resultados en caché sin llamar a Jev.
 
 Pairwise mode (default, one request per document), faithful to TypeSafe's rerank cookbook:
 
