@@ -26,6 +26,7 @@ test('normalization rejects protocol violations with 400-class errors', () => {
     [{ query: 'q', documents: [{ n: 1 }] }, /no text field/],
     [{ query: 'q', documents: ['a'], top_n: 0 }, /top_n must be a positive integer/],
     [{ query: 'q', documents: ['a'], top_k: 1.5 }, /top_k must be a positive integer/],
+    [{ query: 'q', documents: ['a'], top_k: 1, top_n: 1 }, /top_k and top_n cannot be combined/],
     [{ query: 'x'.repeat(4001), documents: ['a'] }, /query exceeds 4000/],
     [{ query: 'q', documents: ['a'], return_documents: 'yes' }, /return_documents must be a boolean/],
     [{ query: 'q', documents: ['a'], rank_fields: [] }, /rank_fields/],

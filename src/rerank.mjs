@@ -60,6 +60,7 @@ export function normalizeRerankRequest(body) {
   if (documents.length > LIMITS.maxDocuments) reject(`documents exceeds the maximum of ${LIMITS.maxDocuments}`);
   if (rankFields !== undefined && !(Array.isArray(rankFields) && rankFields.length && rankFields.every(field => typeof field === 'string'))) reject('rank_fields must be a non-empty array of strings');
   if (returnDocuments !== undefined && typeof returnDocuments !== 'boolean') reject('return_documents must be a boolean');
+  if (topK !== undefined && topN !== undefined) reject('top_k and top_n cannot be combined');
   const warnings = [];
   if (maxChunks !== undefined) warnings.push('max_chunks_per_doc is ignored: each document is scored whole, truncated at 20000 characters');
   const limit = positiveInteger(topK, 'top_k') ?? positiveInteger(topN, 'top_n');

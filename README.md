@@ -3,7 +3,7 @@
 **A drop-in rerank API served by Jev for teams whose RAG stack already has a "rerank base URL" setting.**
 
 [![Tests](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml/badge.svg)](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml)
-[MIT](LICENSE) · Node.js 22+ · No runtime dependencies · v0.5.1
+[MIT](LICENSE) · Node.js 22+ · No runtime dependencies · v0.5.2
 
 The server speaks the Cohere `/v1/rerank` and `/v2/rerank`, Jina `/v1/rerank` and Voyage `/v1/rerank` request and
 response shapes. LangChain, LlamaIndex, Haystack, Dify, Open WebUI and any client with a configurable rerank endpoint
@@ -67,7 +67,7 @@ The official SDKs (`@typesafe-ai/sdk` on npm, `typesafe-sdk` on PyPI) are an alt
 ships its own minimal client so nothing extra is installed.
 
 The release tarball can also be installed without cloning: `npm install -g
-https://github.com/gbesse/jev-rerank-server/releases/download/v0.5.1/jev-rerank-0.5.1.tgz`, then run `jev-rerank`.
+https://github.com/gbesse/jev-rerank-server/releases/download/v0.5.2/jev-rerank-0.5.2.tgz`, then run `jev-rerank`.
 The npm name is reserved in the manifest but registry publication requires maintainer npm authentication.
 
 ## Measured on BEIR SciFact
@@ -178,3 +178,11 @@ is deliberately manual because it makes paid requests.
 
 Independent project; not affiliated with TypeSafe AI. Protocol reference:
 [TypeSafe API](https://docs.typesafe.ai/api) and [known model limitations](https://docs.typesafe.ai/model-jaggedness/jev-1.13).
+
+## October 2026 improvement · Amélioration d’octobre 2026 · Mejora de octubre de 2026
+
+Requests containing both Cohere `top_n` and Voyage `top_k` now receive a 400 validation error, so the response envelope is never chosen ambiguously. Run `npm test` offline.
+
+Les requêtes mêlant `top_n` de Cohere et `top_k` de Voyage reçoivent désormais une erreur 400 ; le format de réponse n’est plus ambigu. Lancez `npm test` hors ligne.
+
+Las solicitudes que mezclan `top_n` de Cohere y `top_k` de Voyage ahora reciben un error 400; el formato de respuesta deja de ser ambiguo. Ejecute `npm test` sin conexión.
