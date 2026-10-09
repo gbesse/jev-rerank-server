@@ -3,6 +3,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 
 export const JEV_MODEL = 'jev-1.13.0';
 export const JEV_ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
+export const CLEF_INPUT_USD_PER_MILLION_TOKENS = Object.freeze({ clef: 0.24, 'clef-flash': 0.038 });
 /** Published price list on 21 Sept 2026: USD 0.042 per million input tokens, output free. */
 export const INPUT_USD_PER_MILLION_TOKENS = 0.042;
 export const DEFAULT_STATE_TOKEN_BUDGET = 24_000;
@@ -96,9 +97,11 @@ function retryAfterMs(header) {
  * is the real constraint. The key is redacted from every error message so it cannot reach HTTP responses or logs.
  */
 export function createJevClient({
-  apiKey = process.env.TYPESAFE_API_KEY,
-  endpoint = JEV_ENDPOINT,
-  model = JEV_MODEL,
+  provider = 'jev',
+  apiKey = provider === 'clef' ? process.env.CLOUDFLARE_AUTH_TOKEN : process.env.TYPESAFE_API_KEY,
+  accountId = process.env.CLOUDFLARE_ACCOUNT_ID,
+  endpoint,
+  model = provider === 'clef' ? 'clef' : JEV_MODEL,
   timeoutMs = 30_000,
   maxRetries = 2,
   fetchImpl = globalThis.fetch,
@@ -106,8 +109,11 @@ export function createJevClient({
   retryBaseMs = 250,
   maxRetryDelayMs = 30_000,
 } = {}) {
-  ensure(typeof apiKey === 'string' && apiKey.length > 0, 'Set TYPESAFE_API_KEY to call Jev', { code: 'missing_key' });
-  ensure(typeof model === 'string' && model.startsWith('jev-') && model !== 'jev-latest', 'Pin an explicit model version such as jev-1.13.0', { code: 'invalid_model' });
+  ensure(provider === 'jev' || provider === 'clef', 'provider must be jev or clef', { code: 'invalid_option' });
+  ensure(typeof apiKey === 'string' && apiKey.length > 0, provider === 'clef' ? 'Set CLOUDFLARE_AUTH_TOKEN to call Clef' : 'Set TYPESAFE_API_KEY to call Jev', { code: 'missing_key' });
+  ensure(provider === 'clef' ? ['clef', 'clef-flash'].includes(model) : typeof model === 'string' && model.startsWith('jev-') && model !== 'jev-latest', provider === 'clef' ? 'model must be clef or clef-flash' : 'Pin an explicit model version such as jev-1.13.0', { code: 'invalid_model' });
+  if (provider === 'clef' && endpoint === undefined) ensure(typeof accountId === 'string' && /^[a-fA-F0-9]{32}$/.test(accountId), 'Set a 32-character CLOUDFLARE_ACCOUNT_ID', { code: 'invalid_account' });
+  endpoint ??= provider === 'clef' ? `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/cloudflare/${model}` : JEV_ENDPOINT;
   ensure(Number.isInteger(timeoutMs) && timeoutMs > 0 && timeoutMs <= 300_000, 'timeoutMs must be between 1 and 300000', { code: 'invalid_option' });
   ensure(Number.isInteger(maxRetries) && maxRetries >= 0 && maxRetries <= 10, 'maxRetries must be between 0 and 10', { code: 'invalid_option' });
   ensure(typeof fetchImpl === 'function', 'fetchImpl must be a function', { code: 'invalid_option' });
@@ -122,8 +128,9 @@ export function createJevClient({
     await sleep(wait, undefined, signal ? { signal } : undefined);
   }
 
-  return async function ask({ state, questions, signal } = {}) {
+  const ask = async function ask({ state, questions, signal } = {}) {
     validateQuestions(questions);
+    if (provider === 'clef') ensure(Object.keys(questions).length <= 64, 'Clef accepts at most 64 questions', { code: 'invalid_questions' });
     ensure(state !== undefined, 'state is required', { code: 'invalid_state' });
     const stateTokens = estimateTokens(state);
     ensure(stateTokens <= stateTokenBudget, `State estimate of ${stateTokens} tokens exceeds the budget of ${stateTokenBudget}`, { code: 'state_budget' });
@@ -160,9 +167,18 @@ export function createJevClient({
       }
       let json;
       try { json = await response.json(); } catch (error) { throw new JevError('Jev returned a non-JSON body', { status: response.status, code: 'invalid_response', cause: error }); }
+      if (provider === 'clef') {
+        ensure(isObject(json) && json.success !== false && isObject(json.result), 'Invalid Clef REST envelope', { code: 'invalid_response' });
+        json = json.result;
+      }
       return validateResponse(json, { model, questions });
     }
   };
+  ask.model = model;
+  ask.estimateCostUsd = provider === 'clef'
+    ? inputTokens => Math.round(inputTokens * CLEF_INPUT_USD_PER_MILLION_TOKENS[model] * 1e3) / 1e9
+    : estimateCostUsd;
+  return ask;
 }
 
 /**

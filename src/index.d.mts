@@ -21,10 +21,11 @@ export interface JevUsage { input_tokens: number; output_tokens: number }
 export interface JevRequest { state: JSONValue; questions: Record<string, Question>; signal?: AbortSignal }
 export interface JevResponse { model: string; answers: Record<string, Answer>; usage: JevUsage }
 /** Any function with this contract can back the server: the real client, the fake, or your own. */
-export type JevProvider = (request: JevRequest) => Promise<JevResponse>;
+export type JevProvider = ((request: JevRequest) => Promise<JevResponse>) & { model?: string; estimateCostUsd?: (inputTokens: number) => number };
 
 export const JEV_MODEL: 'jev-1.13.0';
 export const JEV_ENDPOINT: 'https://api.typesafe.ai/v1/systemone';
+export const CLEF_INPUT_USD_PER_MILLION_TOKENS: Readonly<{ clef: 0.24; 'clef-flash': 0.038 }>;
 export const INPUT_USD_PER_MILLION_TOKENS: 0.042;
 export const DEFAULT_STATE_TOKEN_BUDGET: 24000;
 
@@ -46,7 +47,9 @@ export function validateQuestions(questions: unknown): void;
 export function validateResponse(response: unknown, expected: { model: string; questions: Record<string, Question> }): JevResponse;
 
 export interface JevClientOptions {
+  provider?: 'jev' | 'clef';
   apiKey?: string;
+  accountId?: string;
   endpoint?: string;
   model?: string;
   timeoutMs?: number;
@@ -129,7 +132,7 @@ export function validatePack(pack: number): number;
 export interface ScoreUsage extends JevUsage { requests: number; unique_documents: number; deduplicated_documents: number; cached_documents: number; scored_documents: number }
 export function scoreDocuments(options: { provider: JevProvider; query: string; texts: string[]; pack?: number; limiter?: Limiter; signal?: AbortSignal; cache?: ScoreCache }): Promise<{ scores: number[]; usage: ScoreUsage }>;
 export function rankResults(documents: NormalizedDocument[], scores: number[]): { index: number; relevance_score: number; truncated: boolean }[];
-export function buildRerankResponse(normalized: NormalizedRerankRequest, scores: number[], usage: ScoreUsage): RerankResponse;
+export function buildRerankResponse(normalized: NormalizedRerankRequest, scores: number[], usage: ScoreUsage, options?: { servedBy?: string; costEstimator?: (inputTokens: number) => number }): RerankResponse;
 export function rerank(body: unknown, options: { provider: JevProvider; pack?: number; limiter?: Limiter; signal?: AbortSignal; cache?: ScoreCache }): Promise<RerankResponse>;
 
 export function syntheticRelevance(query: string, passage: string): number;

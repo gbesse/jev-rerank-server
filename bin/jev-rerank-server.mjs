@@ -3,7 +3,7 @@
 import { once } from 'node:events';
 import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { createJevClient, JEV_ENDPOINT } from '../src/jev-client.mjs';
+import { createJevClient } from '../src/jev-client.mjs';
 import { createRerankServer } from '../src/server.mjs';
 import { createLimiter } from '../src/concurrency.mjs';
 import { createScoreCache } from '../src/cache.mjs';
@@ -16,6 +16,10 @@ Environment:
   RERANK_SERVER_TOKEN   optional bearer token clients must send (same as --token)
   JEV_RERANK_PACK       passages per Jev request, 1 (pairwise, default) to ${LIMITS.maxPack}
   JEV_ENDPOINT          override the Jev endpoint (HTTPS, or loopback HTTP for tests)
+  JEV_PROVIDER          jev (default) or clef (Cloudflare Workers AI)
+  JEV_MODEL             clef or clef-flash when JEV_PROVIDER=clef
+  CLOUDFLARE_ACCOUNT_ID 32-character account ID for Clef
+  CLOUDFLARE_AUTH_TOKEN API token for Clef; TYPESAFE_API_KEY remains for Jev
   JEV_CONCURRENCY       parallel Jev requests (default 8)
   JEV_REQUESTS_PER_MINUTE  local rate cap (default 1000)
   JEV_CACHE_TTL_SECONDS exact-score cache lifetime; 0 disables it (default)
@@ -47,7 +51,7 @@ export function parseArgs(argv, env) {
 async function main() {
   const options = parseArgs(process.argv.slice(2), process.env);
   if (options.help) { console.log(USAGE); return; }
-  const provider = createJevClient({ endpoint: process.env.JEV_ENDPOINT || JEV_ENDPOINT });
+  const provider = createJevClient({ provider: process.env.JEV_PROVIDER || 'jev', endpoint: process.env.JEV_ENDPOINT || undefined, model: process.env.JEV_MODEL || undefined });
   const limiter = createLimiter({
     concurrency: process.env.JEV_CONCURRENCY ? Number(process.env.JEV_CONCURRENCY) : 8,
     requestsPerMinute: process.env.JEV_REQUESTS_PER_MINUTE ? Number(process.env.JEV_REQUESTS_PER_MINUTE) : 1000,

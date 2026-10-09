@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { createJevClient, createFakeProvider, validateResponse, estimateTokens, estimateCostUsd, createLimiter, JevError } from '../src/index.mjs';
+import { createJevClient, createFakeProvider, validateResponse, estimateTokens, estimateCostUsd, createLimiter, JevError, rerank } from '../src/index.mjs';
 import { parseArgs } from '../bin/jev-rerank-server.mjs';
 import { startFakeJev } from './fake-jev.mjs';
 
@@ -82,6 +82,27 @@ test('client honours caller aborts without retrying', async () => {
   const controller = new AbortController();
   const client = createJevClient({ apiKey: 'k', maxRetries: 3, fetchImpl: async (_, { signal }) => { controller.abort(new Error('caller cancelled')); signal.throwIfAborted(); } });
   await assert.rejects(client({ state: 's', questions: noul, signal: controller.signal }), /caller cancelled/);
+});
+
+test('Clef transport sends the System One body and validates the Cloudflare REST envelope', async () => {
+  let seen;
+  const client = createJevClient({ provider: 'clef', apiKey: 'synthetic', accountId: 'a'.repeat(32), model: 'clef-flash',
+    fetchImpl: async (url, options) => {
+      seen = { url: String(url), auth: options.headers.authorization, body: JSON.parse(options.body) };
+      return new Response(JSON.stringify({ success: true, result: { model: 'clef-flash', answers: { relevant: { type: 'noul', noul: 0.9 } }, usage } }), { status: 200 });
+    } });
+  const response = await client({ state: { query: 'q' }, questions: noul });
+  assert.equal(response.answers.relevant.noul, 0.9);
+  assert.match(seen.url, /\/ai\/run\/@cf\/cloudflare\/clef-flash$/);
+  assert.equal(seen.auth, 'Bearer synthetic');
+  assert.equal(seen.body.model, 'clef-flash');
+  assert.equal(client.estimateCostUsd(1_000_000), 0.038);
+  const ranked = await rerank({ query: 'q', documents: ['p'] }, { provider: client });
+  assert.equal(ranked.served_by, 'clef-flash');
+  assert.equal(ranked.usage.estimated_cost_usd, client.estimateCostUsd(usage.input_tokens));
+  assert.throws(() => createJevClient({ provider: 'clef', apiKey: 'x', accountId: 'bad' }), /CLOUDFLARE_ACCOUNT_ID/);
+  const bad = createJevClient({ provider: 'clef', apiKey: 'x', endpoint: 'http://localhost:1', fetchImpl: async () => new Response(JSON.stringify({ success: true, result: { model: 'jev-1.13.0', answers: {}, usage } }), { status: 200 }) });
+  await assert.rejects(bad({ state: 's', questions: noul }), /model mismatch/);
 });
 
 test('fake provider validates fixtures like a real response', async () => {

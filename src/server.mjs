@@ -73,7 +73,7 @@ export function createRerankServer({ provider, token = null, pack = 1, limiter =
 
   async function handle(request, response) {
     const url = new URL(request.url, 'http://localhost');
-    if (request.method === 'GET' && url.pathname === '/healthz') return send(response, 200, { ok: true, model: JEV_MODEL, pack, cache: cache ? { enabled: true, ttl_ms: cache.ttlMs, max_entries: cache.maxEntries, entries: cache.size } : { enabled: false } });
+    if (request.method === 'GET' && url.pathname === '/healthz') return send(response, 200, { ok: true, model: provider.model ?? JEV_MODEL, pack, cache: cache ? { enabled: true, ttl_ms: cache.ttlMs, max_entries: cache.maxEntries, entries: cache.size } : { enabled: false } });
     if (request.method === 'GET' && url.pathname === '/metrics') {
       if (token !== null && !tokenMatches(presentedToken(request), token)) return send(response, 401, { message: 'Missing or invalid bearer token' });
       return sendText(response, 200, metrics.render());
@@ -81,8 +81,8 @@ export function createRerankServer({ provider, token = null, pack = 1, limiter =
     if (request.method === 'GET' && url.pathname === '/v1/models') {
       return send(response, 200, {
         object: 'list',
-        data: [JEV_MODEL, ...MODEL_ALIASES].map(id => ({ id, object: 'model', owned_by: id === JEV_MODEL ? 'typesafe-ai' : 'alias', served_by: JEV_MODEL })),
-        note: 'Any other model name is accepted on /v1/rerank and /v2/rerank and served by the pinned Jev model.',
+        data: [provider.model ?? JEV_MODEL, ...MODEL_ALIASES].map(id => ({ id, object: 'model', owned_by: id === (provider.model ?? JEV_MODEL) ? 'configured-provider' : 'alias', served_by: provider.model ?? JEV_MODEL })),
+        note: 'Any other model name is accepted on /v1/rerank and /v2/rerank and served by the configured model.',
       });
     }
     if (!RERANK_PATHS.has(url.pathname)) return send(response, 404, { message: `No route for ${request.method} ${url.pathname}` });

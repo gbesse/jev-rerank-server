@@ -177,7 +177,7 @@ export function rankResults(documents, scores) {
     .sort((a, b) => (b.relevance_score - a.relevance_score) || (a.index - b.index));
 }
 
-export function buildRerankResponse(normalized, scores, usage) {
+export function buildRerankResponse(normalized, scores, usage, { servedBy = JEV_MODEL, costEstimator = estimateCostUsd } = {}) {
   const ranked = rankResults(normalized.documents, scores);
   const kept = normalized.limit === null ? ranked : ranked.slice(0, normalized.limit);
   const items = kept.map(({ index, relevance_score, truncated }) => {
@@ -186,9 +186,9 @@ export function buildRerankResponse(normalized, scores, usage) {
     if (truncated) item.truncated = true;
     return item;
   });
-  const estimatedCost = estimateCostUsd(usage.input_tokens);
+  const estimatedCost = costEstimator(usage.input_tokens);
   if (normalized.shape === 'voyage') {
-    const response = { object: 'list', data: items, model: normalized.model, served_by: JEV_MODEL, usage: { total_tokens: usage.input_tokens + usage.output_tokens, jev_requests: usage.requests, unique_documents: usage.unique_documents, deduplicated_documents: usage.deduplicated_documents, cached_documents: usage.cached_documents, scored_documents: usage.scored_documents, estimated_cost_usd: estimatedCost } };
+    const response = { object: 'list', data: items, model: normalized.model, served_by: servedBy, usage: { total_tokens: usage.input_tokens + usage.output_tokens, jev_requests: usage.requests, unique_documents: usage.unique_documents, deduplicated_documents: usage.deduplicated_documents, cached_documents: usage.cached_documents, scored_documents: usage.scored_documents, estimated_cost_usd: estimatedCost } };
     if (normalized.warnings.length) response.warnings = normalized.warnings;
     return response;
   }
@@ -196,7 +196,7 @@ export function buildRerankResponse(normalized, scores, usage) {
     id: randomUUID(),
     results: items,
     model: normalized.model,
-    served_by: JEV_MODEL,
+    served_by: servedBy,
     usage: { total_tokens: usage.input_tokens + usage.output_tokens, prompt_tokens: usage.input_tokens, jev_requests: usage.requests, unique_documents: usage.unique_documents, deduplicated_documents: usage.deduplicated_documents, cached_documents: usage.cached_documents, scored_documents: usage.scored_documents, estimated_cost_usd: estimatedCost },
     meta: { api_version: { version: '2' }, billed_units: { search_units: 1 } },
   };
@@ -207,9 +207,10 @@ export function buildRerankResponse(normalized, scores, usage) {
 /** Full pipeline for one request body: validate, score, shape. Throws `RerankValidationError` or the provider's error. */
 export async function rerank(body, { provider, pack = 1, limiter, signal, cache } = {}) {
   const normalized = normalizeRerankRequest(body);
-  if (normalized.documents.length === 0) return buildRerankResponse(normalized, [], { input_tokens: 0, output_tokens: 0, requests: 0, unique_documents: 0, deduplicated_documents: 0, cached_documents: 0, scored_documents: 0 });
+  const responseOptions = { servedBy: provider?.model ?? JEV_MODEL, costEstimator: provider?.estimateCostUsd ?? estimateCostUsd };
+  if (normalized.documents.length === 0) return buildRerankResponse(normalized, [], { input_tokens: 0, output_tokens: 0, requests: 0, unique_documents: 0, deduplicated_documents: 0, cached_documents: 0, scored_documents: 0 }, responseOptions);
   const { scores, usage } = await scoreDocuments({ provider, query: normalized.query, texts: normalized.documents.map(document => document.text), pack, limiter, signal, cache });
-  return buildRerankResponse(normalized, scores, usage);
+  return buildRerankResponse(normalized, scores, usage, responseOptions);
 }
 
 const tokens = text => new Set(String(text).toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []);
