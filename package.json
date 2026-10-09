@@ -1,6 +1,6 @@
 {
   "name": "jev-rerank",
-  "version": "0.5.2",
+  "version": "0.6.0-alpha.1",
   "description": "Drop-in rerank API served by Jev: speaks the Cohere, Jina and Voyage /rerank request and response shapes so existing tools switch by changing a URL.",
   "type": "module",
   "exports": {
@@ -19,6 +19,8 @@
     "examples",
     "docs",
     "README.md",
+    "README.fr.md",
+    "README.es.md",
     "LICENSE"
   ],
   "scripts": {

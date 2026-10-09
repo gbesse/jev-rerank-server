@@ -1,5 +1,19 @@
 # Jev Rerank
 
+[Français](README.fr.md) · English · [Español](README.es.md)
+
+## New: rerank with Cloudflare Clef
+
+Choose `JEV_PROVIDER=clef` and `JEV_MODEL=clef` or `clef-flash` to use the same rerank routes with Cloudflare Workers AI. Set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_AUTH_TOKEN` in your environment, then run `npm start`. The adapter sends System One questions to Cloudflare's REST endpoint, unwraps its `result` envelope, validates typed answers, and uses the selected Clef input-token rate for the estimate. `npm test` exercises this path with synthetic replies; a live Cloudflare request has not been verified in this release.
+
+**Related projects:** [Cloudflare Clef](https://developers.cloudflare.com/workers-ai/models/clef/) documents the REST shape and current model price; [Hindsight #5455](https://github.com/vectorize-io/hindsight/issues/5455) reports the practical need for a Clef reranker adapter. This package is independent of both projects. Its existing Cohere/Jina/Voyage-compatible HTTP routes are the actual integration surface.
+
+```sh
+npm run demo
+# Live, only with your own Cloudflare account and token:
+JEV_PROVIDER=clef JEV_MODEL=clef-flash npm start
+```
+
 **A drop-in rerank API served by Jev for teams whose RAG stack already has a "rerank base URL" setting.**
 
 [![Tests](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml/badge.svg)](https://github.com/gbesse/jev-rerank-server/actions/workflows/test.yml)
