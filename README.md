@@ -200,3 +200,7 @@ Requests containing both Cohere `top_n` and Voyage `top_k` now receive a 400 val
 Les requêtes mêlant `top_n` de Cohere et `top_k` de Voyage reçoivent désormais une erreur 400 ; le format de réponse n’est plus ambigu. Lancez `npm test` hors ligne.
 
 Las solicitudes que mezclan `top_n` de Cohere y `top_k` de Voyage ahora reciben un error 400; el formato de respuesta deja de ser ambiguo. Ejecute `npm test` sin conexión.
+
+## Contrôle d’adoption · Adoption check · Comprobación de adopción
+
+[Français : essayer un cas concret](examples/adoption-check.md) · [English: try a concrete case](examples/adoption-check.md) · [Español: pruebe un caso concreto](examples/adoption-check.md).
