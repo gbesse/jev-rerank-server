@@ -34,7 +34,8 @@
     "benchmark:offline": "node scripts/benchmark-scifact.mjs --offline",
     "test:cohere": "node scripts/verify-cohere-python.mjs",
     "test:frameworks": "node scripts/verify-frameworks-python.mjs",
-    "release:check": "npm run check && npm run typecheck && npm test && npm run demo && npm pack --dry-run"
+    "release:check": "npm run check && npm run typecheck && npm test && npm run demo && npm pack --dry-run",
+    "demo:conflicting-limits": "node examples/conflicting-limits.mjs"
   },
   "engines": {
     "node": ">=22"
