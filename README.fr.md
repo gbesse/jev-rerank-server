@@ -1,5 +1,11 @@
 # Jev Rerank
 
+## Nouveau : le cache respecte le contexte des passages groupés
+
+`node examples/packed-cache.mjs` montre un fournisseur **synthétique** dont le score change selon les autres passages présents. En mode paire (`pack=1`), le cache exact reste actif. En mode groupé (`pack>1`), il n’est ni lu ni alimenté : une entrée `(query, passage)` ne représente pas les autres passages ni leur position. Les requêtes groupées annoncent ce choix dans les avertissements FR/EN/ES et rapportent zéro document servi du cache. Cela peut augmenter les appels si vous combiniez groupe et cache auparavant.
+
+Cette correction empêche de réutiliser un score issu d’un autre contexte. Elle ne mesure pas une amélioration de qualité Jev et n’ajoute pas de cache de groupes complets. La démo vérifie une paire à 0,9, un groupe à 0,1, un autre contexte à 0,8 et une relecture de la paire sans appel supplémentaire. Les probabilités sont fictives. Les indices et doublons du protocole sont conservés.
+
 [English](README.md) · Français · [Español](README.es.md)
 
 ## Reranker avec Cloudflare Clef
