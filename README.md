@@ -1,5 +1,11 @@
 # Jev Rerank
 
+## New: score caching respects packed context
+
+`node examples/packed-cache.mjs` shows a **synthetic** provider whose score changes with companion passages. Exact caching remains active for pairwise mode (`pack=1`). Packed mode (`pack>1`) neither reads nor populates it: a `(query, passage)` entry cannot represent companion passages or their positions. Packed requests announce this choice in FR/EN/ES warnings and report zero cached documents. This can increase calls if you previously combined packing and caching.
+
+The fix prevents reusing a score from another context. It does not measure improved Jev quality or add whole-group caching. The demo checks a pair at 0.9, a packed group at 0.1, another context at 0.8 and a pair replay without another call. Probabilities are fictional. Protocol indices and duplicates are preserved.
+
 [Français](README.fr.md) · English · [Español](README.es.md)
 
 ## New: rerank with Cloudflare Clef
@@ -89,10 +95,10 @@ The npm name is reserved in the manifest but registry publication requires maint
 The checked-in v0.2 benchmark uses BM25 to retrieve 20 candidates and Jev pairwise mode only to reorder them. On a
 deterministic 25-query sample, at `k=10`:
 
-| Ranker | nDCG@10 | MRR@10 | Recall@10 |
-| --- | ---: | ---: | ---: |
-| BM25 | 0.616377 | 0.548159 | 0.84 |
-| BM25 → Jev | **0.718260** | **0.685048** | 0.84 |
+| Ranker     |      nDCG@10 |       MRR@10 | Recall@10 |
+| ---------- | -----------: | -----------: | --------: |
+| BM25       |     0.616377 |     0.548159 |      0.84 |
+| BM25 → Jev | **0.718260** | **0.685048** |      0.84 |
 
 The live run made 500 Jev requests, consumed 369,576 input tokens, cost an estimated **$0.015522**, and took 16.9
 seconds from this development machine. Candidate recall was 0.84, so the reranker could not recover missing documents.
@@ -109,7 +115,7 @@ Use it as a library when you want the pipeline without HTTP:
 ```js
 import { createJevClient, createRerankServer, rerank } from 'jev-rerank';
 
-const provider = createJevClient();                 // reads TYPESAFE_API_KEY
+const provider = createJevClient(); // reads TYPESAFE_API_KEY
 const response = await rerank({ query, documents, top_n: 5 }, { provider });
 console.log(response.results, response.usage.estimated_cost_usd);
 
@@ -126,11 +132,11 @@ Run `node examples/cache-savings.mjs` to compare a first query, a repeated query
 Pairwise mode (default, one request per document), faithful to TypeSafe's rerank cookbook:
 
 - State: `{ "query": "<query>", "passage": "<document text>" }`.
-- Question `relevant`, type `noul`, instructions: *"Does the passage directly answer the query or contain the specific
-  information the query asks for?"*
-- Criteria true: *"The passage states the specific fact, answer or content the query is looking for."*
-  Criteria false: *"The passage is only on a related topic, mentions the same words, or does not contain what the query
-  asks for."*
+- Question `relevant`, type `noul`, instructions: _"Does the passage directly answer the query or contain the specific
+  information the query asks for?"_
+- Criteria true: _"The passage states the specific fact, answer or content the query is looking for."_
+  Criteria false: _"The passage is only on a related topic, mentions the same words, or does not contain what the query
+  asks for."_
 - `relevance_score` is the returned probability, unchanged. Results are sorted descending; ties keep the original order;
   `top_n`/`top_k` is applied after sorting.
 

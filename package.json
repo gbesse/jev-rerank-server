@@ -1,6 +1,6 @@
 {
   "name": "jev-rerank",
-  "version": "0.6.0-alpha.1",
+  "version": "0.6.1-alpha.1",
   "description": "Drop-in rerank API served by Jev: speaks the Cohere, Jina and Voyage /rerank request and response shapes so existing tools switch by changing a URL.",
   "type": "module",
   "exports": {
@@ -35,7 +35,8 @@
     "test:cohere": "node scripts/verify-cohere-python.mjs",
     "test:frameworks": "node scripts/verify-frameworks-python.mjs",
     "release:check": "npm run check && npm run typecheck && npm test && npm run demo && npm pack --dry-run",
-    "demo:conflicting-limits": "node examples/conflicting-limits.mjs"
+    "demo:conflicting-limits": "node examples/conflicting-limits.mjs",
+    "demo:packed-cache": "node examples/packed-cache.mjs"
   },
   "engines": {
     "node": ">=22"

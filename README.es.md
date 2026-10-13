@@ -1,5 +1,11 @@
 # Jev Rerank
 
+## Nuevo: el caché respeta el contexto de pasajes agrupados
+
+`node examples/packed-cache.mjs` muestra un proveedor **sintético** cuya puntuación cambia con otros pasajes presentes. El caché exacto sigue activo para pares (`pack=1`). En modo agrupado (`pack>1`) no se lee ni se alimenta: una entrada `(query, passage)` no representa otros pasajes ni sus posiciones. Las solicitudes agrupadas anuncian la decisión en avisos FR/EN/ES y cuentan cero documentos del caché. Puede aumentar las llamadas si antes combinaba agrupación y caché.
+
+La corrección impide reutilizar una puntuación de otro contexto. No mide una mejora de calidad Jev ni añade caché de grupos completos. La demo comprueba un par con 0,9, un grupo con 0,1, otro contexto con 0,8 y reproducción del par sin otra llamada. Las probabilidades son ficticias. Se conservan índices y duplicados del protocolo.
+
 [English](README.md) · [Français](README.fr.md) · Español
 
 ## Reranking con Cloudflare Clef

@@ -119,6 +119,9 @@ export async function scoreDocuments({ provider, query, texts, pack = 1, limiter
   // Retrieval pipelines can return the same chunk more than once (for example through several indexes). Jev's
   // judgment is a pure function of the query and rendered passage, so score each distinct passage once and fan the
   // result back out to every original position. This preserves protocol indices while avoiding duplicate paid calls.
+  // A packed score depends on companion passages and their positions. An exact pair cache
+  // cannot represent that context, so packed requests neither read nor populate it.
+  const pairCache = pack === 1 ? cache : undefined;
   const uniqueTexts = [];
   const uniqueIndexByText = new Map();
   const originalToUnique = texts.map(text => {
@@ -132,7 +135,7 @@ export async function scoreDocuments({ provider, query, texts, pack = 1, limiter
   const missingIndices = [];
   let cachedDocuments = 0;
   uniqueTexts.forEach((text, index) => {
-    const cached = cache?.get(query, text);
+    const cached = pairCache?.get(query, text);
     if (cached === undefined) missingIndices.push(index);
     else {
       uniqueScores[index] = cached;
@@ -160,7 +163,7 @@ export async function scoreDocuments({ provider, query, texts, pack = 1, limiter
     throw error;
   }
   // Do not warm a shared cache from a partial request: all provider groups must succeed first.
-  if (cache) for (const index of missingIndices) cache.set(query, uniqueTexts[index], uniqueScores[index]);
+  if (pairCache) for (const index of missingIndices) pairCache.set(query, uniqueTexts[index], uniqueScores[index]);
   return { scores: originalToUnique.map(index => uniqueScores[index]), usage };
 }
 
@@ -207,6 +210,7 @@ export function buildRerankResponse(normalized, scores, usage, { servedBy = JEV_
 /** Full pipeline for one request body: validate, score, shape. Throws `RerankValidationError` or the provider's error. */
 export async function rerank(body, { provider, pack = 1, limiter, signal, cache } = {}) {
   const normalized = normalizeRerankRequest(body);
+  if (pack > 1 && cache) normalized.warnings.push('FR : cache par paire désactivé en mode groupé : le contexte des autres passages peut modifier les scores. EN: pair cache disabled in packed mode: companion passages can change scores. ES: caché por par desactivada en modo agrupado: otros pasajes pueden cambiar las puntuaciones.');
   const responseOptions = { servedBy: provider?.model ?? JEV_MODEL, costEstimator: provider?.estimateCostUsd ?? estimateCostUsd };
   if (normalized.documents.length === 0) return buildRerankResponse(normalized, [], { input_tokens: 0, output_tokens: 0, requests: 0, unique_documents: 0, deduplicated_documents: 0, cached_documents: 0, scored_documents: 0 }, responseOptions);
   const { scores, usage } = await scoreDocuments({ provider, query: normalized.query, texts: normalized.documents.map(document => document.text), pack, limiter, signal, cache });
