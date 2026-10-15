@@ -21,3 +21,7 @@ JEV_PROVIDER=clef JEV_MODEL=clef-flash npm start
 ```
 
 Consulte el [README en inglés](README.md) para las funciones anteriores y sus límites.
+
+## Caché exacta por proveedor
+
+El `createScoreCache` integrado aísla puntuaciones por identidad de función del proveedor y modelo declarado. Dos proveedores con el mismo nombre de modelo y una caché compartida ya no reutilizan sus puntuaciones. Mantenga estable la función entre llamadas para aprovechar la caché. Si cambia configuración oculta, llame a `cache.clear()` o cree otro proveedor: los cambios de cierre no son detectables. Las llamadas manuales aceptan un argumento de proveedor opcional; entradas sin proveedor no alimentan el reranking. Una caché personalizada debe respetar el argumento para ofrecer el mismo aislamiento. El modo agrupado sigue sin caché.

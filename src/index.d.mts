@@ -72,8 +72,8 @@ export interface ScoreCache {
   readonly ttlMs: number;
   readonly maxEntries: number;
   readonly size: number;
-  get(query: string, document: string): number | undefined;
-  set(query: string, document: string, score: number): void;
+  get(query: string, document: string, provider?: JevProvider): number | undefined;
+  set(query: string, document: string, score: number, provider?: JevProvider): void;
   clear(): void;
 }
 export function createScoreCache(options?: { ttlMs?: number; maxEntries?: number; now?: () => number }): ScoreCache;

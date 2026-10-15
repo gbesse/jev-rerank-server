@@ -210,3 +210,7 @@ Las solicitudes que mezclan `top_n` de Cohere y `top_k` de Voyage ahora reciben 
 ## Contrôle d’adoption · Adoption check · Comprobación de adopción
 
 [Français : essayer un cas concret](examples/adoption-check.md) · [English: try a concrete case](examples/adoption-check.md) · [Español: pruebe un caso concreto](examples/adoption-check.md).
+
+## Provider-scoped exact cache
+
+The built-in `createScoreCache` isolates exact scores by provider function identity and its declared model. Sharing one cache between two providers with the same model name no longer reuses their scores. Keep the provider function stable across calls to benefit from reuse. If you mutate hidden provider configuration, call `cache.clear()` or create a new provider: closure changes cannot be detected. Manual cache calls accept an optional provider argument; unscoped manual entries do not warm reranking. Custom cache implementations must respect that argument to provide the same isolation. Packed mode remains uncached.

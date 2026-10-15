@@ -21,3 +21,7 @@ JEV_PROVIDER=clef JEV_MODEL=clef-flash npm start
 ```
 
 Consultez le [README anglais](README.md) pour les anciennes fonctions et limites.
+
+## Cache exact par fournisseur
+
+Le `createScoreCache` intégré isole les scores par identité de fonction fournisseur et modèle déclaré. Deux fournisseurs de même nom de modèle partageant un cache ne réutilisent plus leurs scores. Gardez la fonction stable entre appels pour bénéficier du cache. Si vous changez une configuration cachée, appelez `cache.clear()` ou créez un nouveau fournisseur : les changements de fermeture ne sont pas détectables. Les appels manuels au cache acceptent un argument fournisseur optionnel ; les entrées sans fournisseur n’alimentent pas le reranking. Un cache personnalisé doit respecter cet argument pour fournir la même isolation. Le mode groupé reste sans cache.

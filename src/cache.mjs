@@ -15,14 +15,21 @@ export function createScoreCache({ ttlMs = 300_000, maxEntries = 5000, now = Dat
   positiveInteger(maxEntries, 'maxEntries');
   if (typeof now !== 'function') throw new TypeError('now must be a function');
   const entries = new Map();
-  const keyFor = (query, document) => JSON.stringify([query, document]);
+  const providerIds = new WeakMap();
+  let nextProviderId = 1;
+  const keyFor = (query, document, provider) => {
+    if (provider !== undefined && typeof provider !== 'function')
+      throw new TypeError('FR : namespace fournisseur doit être une fonction. EN: provider namespace must be a function. ES: el namespace del proveedor debe ser una función.');
+    if (provider && !providerIds.has(provider)) providerIds.set(provider, nextProviderId++);
+    return JSON.stringify([provider ? providerIds.get(provider) : null, provider?.model ?? null, query, document]);
+  };
 
   return Object.freeze({
     ttlMs,
     maxEntries,
     get size() { return entries.size; },
-    get(query, document) {
-      const key = keyFor(query, document);
+    get(query, document, provider) {
+      const key = keyFor(query, document, provider);
       const entry = entries.get(key);
       if (!entry) return undefined;
       if (entry.expiresAt <= now()) {
@@ -34,9 +41,9 @@ export function createScoreCache({ ttlMs = 300_000, maxEntries = 5000, now = Dat
       entries.set(key, entry);
       return entry.score;
     },
-    set(query, document, score) {
+    set(query, document, score, provider) {
       if (!(Number.isFinite(score) && score >= 0 && score <= 1)) throw new RangeError('score must be finite and in [0,1]');
-      const key = keyFor(query, document);
+      const key = keyFor(query, document, provider);
       entries.delete(key);
       entries.set(key, { score, expiresAt: now() + ttlMs });
       while (entries.size > maxEntries) entries.delete(entries.keys().next().value);
