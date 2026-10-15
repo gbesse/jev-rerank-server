@@ -97,11 +97,11 @@ test('exact score cache avoids repeated provider calls, expires and evicts least
   assert.equal(second.usage.cached_documents, 2);
   assert.equal(second.usage.scored_documents, 0);
   assert.equal(second.usage.total_tokens, 0);
-  cache.get(body.query, body.documents[0]); // Paris is now most recently used.
+  cache.get(body.query, body.documents[0], counting); // Paris is now most recently used.
   cache.set('q2', 'd2', 0.2); // Evicts "nothing here".
-  assert.equal(cache.get(body.query, body.documents[1]), undefined);
+  assert.equal(cache.get(body.query, body.documents[1], counting), undefined);
   clock += 101;
-  assert.equal(cache.get(body.query, body.documents[0]), undefined);
+  assert.equal(cache.get(body.query, body.documents[0], counting), undefined);
   assert.throws(() => createScoreCache({ ttlMs: 0 }), /ttlMs/);
 });
 

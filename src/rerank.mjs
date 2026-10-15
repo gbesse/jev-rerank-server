@@ -135,7 +135,7 @@ export async function scoreDocuments({ provider, query, texts, pack = 1, limiter
   const missingIndices = [];
   let cachedDocuments = 0;
   uniqueTexts.forEach((text, index) => {
-    const cached = pairCache?.get(query, text);
+    const cached = pairCache?.get(query, text, provider);
     if (cached === undefined) missingIndices.push(index);
     else {
       uniqueScores[index] = cached;
@@ -163,7 +163,7 @@ export async function scoreDocuments({ provider, query, texts, pack = 1, limiter
     throw error;
   }
   // Do not warm a shared cache from a partial request: all provider groups must succeed first.
-  if (pairCache) for (const index of missingIndices) pairCache.set(query, uniqueTexts[index], uniqueScores[index]);
+  if (pairCache) for (const index of missingIndices) pairCache.set(query, uniqueTexts[index], uniqueScores[index], provider);
   return { scores: originalToUnique.map(index => uniqueScores[index]), usage };
 }
 
