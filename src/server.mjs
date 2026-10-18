@@ -88,10 +88,20 @@ export function createRerankServer({ provider, token = null, pack = 1, limiter =
     if (!RERANK_PATHS.has(url.pathname)) return send(response, 404, { message: `No route for ${request.method} ${url.pathname}` });
     if (request.method !== 'POST') return send(response, 405, { message: 'Use POST' });
     if (token !== null && !tokenMatches(presentedToken(request), token)) return send(response, 401, { message: 'Missing or invalid bearer token' });
-    const body = await readJsonBody(request, maxBodyBytes);
-    const result = await rerank(body, { provider, pack, limiter, cache });
-    send(response, 200, result);
-    return { usage: result.usage, documents: body.documents.length };
+    const controller = new AbortController();
+    const abort = () => controller.abort(new DOMException('Client déconnecté / Client disconnected / Cliente desconectado', 'AbortError'));
+    const closed = () => { if (!response.writableFinished) abort(); };
+    request.once('aborted', abort);
+    response.once('close', closed);
+    try {
+      const body = await readJsonBody(request, maxBodyBytes);
+      const result = await rerank(body, { provider, pack, limiter, cache, signal: controller.signal });
+      if (!response.destroyed) send(response, 200, result);
+      return { usage: result.usage, documents: body.documents.length };
+    } finally {
+      request.removeListener('aborted', abort);
+      response.removeListener('close', closed);
+    }
   }
 
   return createServer((request, response) => {
@@ -105,7 +115,7 @@ export function createRerankServer({ provider, token = null, pack = 1, limiter =
       const { status, message } = describeError(error);
       // Unexpected failures are worth a full stack on stderr; expected client errors are noise there.
       if (status >= 500) log(`[jev-rerank-server] ${request.method} ${request.url} -> ${status}: ${status === 500 ? (error?.stack ?? error) : message}`);
-      if (!response.headersSent) send(response, status, { message });
+      if (!response.headersSent && !response.destroyed) send(response, status, { message });
       else response.destroy();
       if (measured) metrics.finish({ status, durationSeconds: Number(process.hrtime.bigint() - started) / 1e9 });
     });
