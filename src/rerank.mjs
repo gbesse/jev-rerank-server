@@ -115,6 +115,7 @@ export function validatePack(pack) {
  */
 export async function scoreDocuments({ provider, query, texts, pack = 1, limiter, signal, cache }) {
   validatePack(pack);
+  signal?.throwIfAborted();
   if (typeof provider !== 'function') throw new TypeError('provider is required');
   // Retrieval pipelines can return the same chunk more than once (for example through several indexes). Jev's
   // judgment is a pure function of the query and rendered passage, so score each distinct passage once and fan the
@@ -146,17 +147,24 @@ export async function scoreDocuments({ provider, query, texts, pack = 1, limiter
   for (let start = 0; start < missingIndices.length; start += pack) groups.push(missingIndices.slice(start, start + pack));
   const internal = new AbortController();
   const combined = signal ? AbortSignal.any([signal, internal.signal]) : internal.signal;
-  const run = limiter ? fn => limiter.run(fn) : fn => fn();
+  const run = limiter ? fn => limiter.run(fn, { signal: combined }) : fn => fn();
   const usage = { input_tokens: 0, output_tokens: 0, requests: 0, unique_documents: uniqueTexts.length, deduplicated_documents: texts.length - uniqueTexts.length, cached_documents: cachedDocuments, scored_documents: missingIndices.length };
   try {
     await Promise.all(groups.map(group => run(async () => {
       combined.throwIfAborted();
       const request = pack > 1 ? buildPackedRequest(query, group.map(index => uniqueTexts[index])) : buildPairwiseRequest(query, uniqueTexts[group[0]]);
-      const response = await provider({ ...request, signal: combined });
-      usage.requests++;
-      usage.input_tokens += response.usage.input_tokens;
-      usage.output_tokens += response.usage.output_tokens;
-      group.forEach((index, position) => { uniqueScores[index] = pack > 1 ? response.answers[`p${position + 1}`].noul : response.answers.relevant.noul; });
+      try {
+        const response = await provider({ ...request, signal: combined });
+        combined.throwIfAborted();
+        usage.requests++;
+        usage.input_tokens += response.usage.input_tokens;
+        usage.output_tokens += response.usage.output_tokens;
+        group.forEach((index, position) => { uniqueScores[index] = pack > 1 ? response.answers[`p${position + 1}`].noul : response.answers.relevant.noul; });
+      } catch (error) {
+        // Notify queued siblings before the limiter releases this failed slot.
+        internal.abort(error);
+        throw error;
+      }
     })));
   } catch (error) {
     internal.abort(error);

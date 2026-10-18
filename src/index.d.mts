@@ -66,8 +66,8 @@ export type FakeFixtures =
   | ((request: { model: string; state: JSONValue; questions: Record<string, Question> }) => Record<string, Answer> | { answers: Record<string, Answer>; usage?: JevUsage } | Promise<Record<string, Answer> | { answers: Record<string, Answer>; usage?: JevUsage }>);
 export function createFakeProvider(fixtures: FakeFixtures, options?: { model?: string }): JevProvider;
 
-export interface Limiter { run<T>(fn: () => Promise<T> | T): Promise<T>; readonly active: number; readonly pending: number }
-export function createLimiter(options?: { concurrency?: number; requestsPerMinute?: number; now?: () => number; sleep?: (ms: number) => Promise<void> }): Limiter;
+export interface Limiter { run<T>(fn: () => Promise<T> | T, options?: { signal?: AbortSignal }): Promise<T>; readonly active: number; readonly pending: number }
+export function createLimiter(options?: { concurrency?: number; requestsPerMinute?: number; now?: () => number; sleep?: (ms: number, signal?: AbortSignal) => Promise<void> }): Limiter;
 export interface ScoreCache {
   readonly ttlMs: number;
   readonly maxEntries: number;

@@ -1,50 +1,80 @@
-// Purpose: In-process concurrency cap and sliding-window rate limiter shared by every parallel Jev call.
+// Purpose: Shared concurrency/rate admission with removable abandoned queued work.
 import { setTimeout as delay } from 'node:timers/promises';
 
-/**
- * `run(fn)` executes `fn` once a concurrency slot is free and fewer than `requestsPerMinute` starts happened in the last
- * minute. The defaults stay under Jev's published 1,200 requests/min so a burst of rerank calls backs off locally instead
- * of collecting 429s. `now` and `sleep` are injectable so tests can drive the clock.
- */
-export function createLimiter({ concurrency = 8, requestsPerMinute = 1000, now = () => Date.now(), sleep = ms => delay(ms) } = {}) {
+export function createLimiter({ concurrency = 8, requestsPerMinute = 1000, now = () => Date.now(), sleep = (ms, signal) => delay(ms, undefined, { signal }) } = {}) {
   if (!(Number.isInteger(concurrency) && concurrency >= 1 && concurrency <= 256)) throw new RangeError('concurrency must be an integer between 1 and 256');
   if (!(Number.isInteger(requestsPerMinute) && requestsPerMinute >= 1)) throw new RangeError('requestsPerMinute must be a positive integer');
   const WINDOW_MS = 60_000;
   let active = 0;
-  const queue = [];
+  let queue = [];
   const starts = [];
+  const watchers = new Map();
 
-  function pump() {
-    while (active < concurrency && queue.length) {
-      active++;
-      queue.shift()();
-    }
+  function unwatch(job) {
+    const bucket = watchers.get(job.signal);
+    if (!bucket) return;
+    bucket.jobs.delete(job);
+    if (!bucket.jobs.size) { job.signal.removeEventListener('abort', bucket.abort); watchers.delete(job.signal); }
   }
-
-  async function waitForRateSlot() {
+  function watch(job) {
+    if (!job.signal) return;
+    let bucket = watchers.get(job.signal);
+    if (!bucket) {
+      bucket = { jobs: new Set(), abort: null };
+      bucket.abort = () => {
+        queue = queue.filter(item => !bucket.jobs.has(item));
+        watchers.delete(job.signal);
+        for (const item of bucket.jobs) item.reject(job.signal.reason);
+        bucket.jobs.clear();
+        pump();
+      };
+      watchers.set(job.signal, bucket);
+      job.signal.addEventListener('abort', bucket.abort, { once: true });
+    }
+    bucket.jobs.add(job);
+  }
+  async function pause(ms, signal) {
+    if (!signal) return sleep(ms);
+    signal.throwIfAborted();
+    await new Promise((resolve, reject) => {
+      const abort = () => { signal.removeEventListener('abort', abort); reject(signal.reason); };
+      signal.addEventListener('abort', abort, { once: true });
+      Promise.resolve().then(() => { signal.throwIfAborted(); return sleep(ms, signal); }).then(
+        value => { signal.removeEventListener('abort', abort); resolve(value); },
+        error => { signal.removeEventListener('abort', abort); reject(error); },
+      );
+    });
+  }
+  async function waitForRateSlot(signal) {
     for (;;) {
+      signal?.throwIfAborted();
       const current = now();
       while (starts.length && starts[0] <= current - WINDOW_MS) starts.shift();
       if (starts.length < requestsPerMinute) { starts.push(current); return; }
-      await sleep(starts[0] + WINDOW_MS - current);
+      await pause(starts[0] + WINDOW_MS - current, signal);
     }
   }
-
+  function pump() {
+    while (active < concurrency && queue.length) {
+      const job = queue.shift();
+      unwatch(job);
+      if (job.signal?.aborted) { job.reject(job.signal.reason); continue; }
+      active++;
+      (async () => {
+        try { await waitForRateSlot(job.signal); job.signal?.throwIfAborted(); job.resolve(await job.fn()); }
+        catch (error) { job.reject(error); }
+        finally { active--; pump(); }
+      })();
+    }
+  }
   return {
-    run(fn) {
+    run(fn, { signal } = {}) {
+      if (typeof fn !== 'function') return Promise.reject(new TypeError('Tâche invalide / Invalid task / Tarea no válida'));
+      if (signal !== undefined && !(signal instanceof AbortSignal)) return Promise.reject(new TypeError('Signal invalide / Invalid signal / Señal no válida'));
+      if (signal?.aborted) return Promise.reject(signal.reason);
       return new Promise((resolve, reject) => {
-        queue.push(async () => {
-          try {
-            await waitForRateSlot();
-            resolve(await fn());
-          } catch (error) {
-            reject(error);
-          } finally {
-            active--;
-            pump();
-          }
-        });
-        pump();
+        const job = { fn, signal, resolve, reject };
+        queue.push(job); watch(job); pump();
       });
     },
     get active() { return active; },
