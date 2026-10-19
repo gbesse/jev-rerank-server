@@ -65,9 +65,12 @@ export function normalizeRerankRequest(body) {
   if (maxChunks !== undefined) warnings.push('max_chunks_per_doc is ignored: each document is scored whole, truncated at 20000 characters');
   const limit = positiveInteger(topK, 'top_k') ?? positiveInteger(topN, 'top_n');
   const normalizedDocuments = documents.map((document, index) => {
-    const full = documentText(document, index, rankFields);
+    let original;
+    try { original = structuredClone(document); }
+    catch { reject('Document non copiable / Document cannot be snapshotted / No se puede copiar el documento'); }
+    const full = documentText(original, index, rankFields);
     const truncated = full.length > LIMITS.maxDocumentChars;
-    return { index, text: truncated ? full.slice(0, LIMITS.maxDocumentChars) : full, truncated, original: document };
+    return { index, text: truncated ? full.slice(0, LIMITS.maxDocumentChars) : full, truncated, original };
   });
   return {
     model: model ?? JEV_MODEL,

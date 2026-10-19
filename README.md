@@ -229,3 +229,7 @@ FR : `node --test test/cancellation.test.mjs` vérifie les portes contrôlées e
 EN: `node --test test/cancellation.test.mjs` checks controlled gates and an actual loopback HTTP disconnect, without a model or external service. The [Hindsight report](https://github.com/vectorize-io/hindsight/issues/5722) describes an adjacent problem; this changes our own scheduler, with no Hindsight fix or integration.
 
 ES: `node --test test/cancellation.test.mjs` comprueba puertas controladas y una desconexión HTTP local real, sin modelo ni servicio externo. El [informe Hindsight](https://github.com/vectorize-io/hindsight/issues/5722) describe un problema vecino; este cambio afecta a nuestro planificador, sin arreglo ni integración Hindsight.
+
+## Source-bound returned documents
+
+Returned object documents are snapshotted before scoring, including metadata and `rank_fields` inputs. Caller or provider callbacks cannot rewrite returned evidence after the scored passage is fixed. Uncloneable document data fails admission before provider calls. JSON protocol shapes, indices and score ordering are unchanged; this does not establish source authenticity.
