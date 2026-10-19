@@ -25,3 +25,7 @@ Consulte el [README en inglés](README.md) para las funciones anteriores y sus l
 ## Caché exacta por proveedor
 
 El `createScoreCache` integrado aísla puntuaciones por identidad de función del proveedor y modelo declarado. Dos proveedores con el mismo nombre de modelo y una caché compartida ya no reutilizan sus puntuaciones. Mantenga estable la función entre llamadas para aprovechar la caché. Si cambia configuración oculta, llame a `cache.clear()` o cree otro proveedor: los cambios de cierre no son detectables. Las llamadas manuales aceptan un argumento de proveedor opcional; entradas sin proveedor no alimentan el reranking. Una caché personalizada debe respetar el argumento para ofrecer el mismo aislamiento. El modo agrupado sigue sin caché.
+
+## Documentos devueltos ligados a su fuente
+
+Los documentos objeto se copian antes de evaluar, incluidos metadatos y entradas `rank_fields`. Callbacks del cliente o proveedor no pueden reescribir pruebas devueltas tras fijar el pasaje evaluado. Datos no copiables se rechazan antes de llamar al proveedor. Formatos JSON, índices y orden no cambian; esto no demuestra autenticidad de la fuente.
