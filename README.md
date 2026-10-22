@@ -233,3 +233,11 @@ ES: `node --test test/cancellation.test.mjs` comprueba puertas controladas y una
 ## Source-bound returned documents
 
 Returned object documents are snapshotted before scoring, including metadata and `rank_fields` inputs. Caller or provider callbacks cannot rewrite returned evidence after the scored passage is fixed. Uncloneable document data fails admission before provider calls. JSON protocol shapes, indices and score ordering are unchanged; this does not establish source authenticity.
+
+## Horloge / Clock / Reloj
+
+FR — Le cache refuse les horloges non finies et les expirations hors précision entière ; une erreur ne remplace pas un score existant.
+
+EN — The cache rejects nonfinite clocks and expiries beyond integer precision; an error cannot replace an existing score.
+
+ES — La caché rechaza relojes no finitos y caducidades fuera de precisión entera; un error no sustituye una puntuación existente.
