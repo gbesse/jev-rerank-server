@@ -29,3 +29,5 @@ El `createScoreCache` integrado aísla puntuaciones por identidad de función de
 ## Documentos devueltos ligados a su fuente
 
 Los documentos objeto se copian antes de evaluar, incluidos metadatos y entradas `rank_fields`. Callbacks del cliente o proveedor no pueden reescribir pruebas devueltas tras fijar el pasaje evaluado. Datos no copiables se rechazan antes de llamar al proveedor. Formatos JSON, índices y orden no cambian; esto no demuestra autenticidad de la fuente.
+
+La caché rechaza relojes no finitos y caducidades fuera de precisión entera; un error no sustituye una puntuación existente.

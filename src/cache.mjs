@@ -2,7 +2,7 @@
 
 function positiveInteger(value, name, { allowZero = false } = {}) {
   const minimum = allowZero ? 0 : 1;
-  if (!(Number.isInteger(value) && value >= minimum)) throw new RangeError(`${name} must be an integer >= ${minimum}`);
+  if (!(Number.isSafeInteger(value) && value >= minimum)) throw new RangeError(`${name} must be an integer >= ${minimum}`);
   return value;
 }
 
@@ -14,6 +14,11 @@ export function createScoreCache({ ttlMs = 300_000, maxEntries = 5000, now = Dat
   positiveInteger(ttlMs, 'ttlMs');
   positiveInteger(maxEntries, 'maxEntries');
   if (typeof now !== 'function') throw new TypeError('now must be a function');
+  const clock = () => {
+    const value = now();
+    if (!Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER) throw new RangeError('Horloge de cache invalide / Invalid cache clock / Reloj de caché no válido');
+    return value;
+  };
   const entries = new Map();
   const providerIds = new WeakMap();
   let nextProviderId = 1;
@@ -29,10 +34,11 @@ export function createScoreCache({ ttlMs = 300_000, maxEntries = 5000, now = Dat
     maxEntries,
     get size() { return entries.size; },
     get(query, document, provider) {
+      const current = clock();
       const key = keyFor(query, document, provider);
       const entry = entries.get(key);
       if (!entry) return undefined;
-      if (entry.expiresAt <= now()) {
+      if (entry.expiresAt <= current) {
         entries.delete(key);
         return undefined;
       }
@@ -44,8 +50,10 @@ export function createScoreCache({ ttlMs = 300_000, maxEntries = 5000, now = Dat
     set(query, document, score, provider) {
       if (!(Number.isFinite(score) && score >= 0 && score <= 1)) throw new RangeError('score must be finite and in [0,1]');
       const key = keyFor(query, document, provider);
+      const expiresAt = clock() + ttlMs;
+      if (!Number.isFinite(expiresAt) || expiresAt > Number.MAX_SAFE_INTEGER) throw new RangeError('Expiration de cache hors limites / Cache expiry out of bounds / Caducidad de caché fuera de límites');
       entries.delete(key);
-      entries.set(key, { score, expiresAt: now() + ttlMs });
+      entries.set(key, { score, expiresAt });
       while (entries.size > maxEntries) entries.delete(entries.keys().next().value);
     },
     clear() { entries.clear(); },

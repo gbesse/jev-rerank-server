@@ -29,3 +29,5 @@ Le `createScoreCache` intégré isole les scores par identité de fonction fourn
 ## Documents retournés liés à leur source
 
 Les documents objets sont copiés avant évaluation, métadonnées et entrées `rank_fields` comprises. Les callbacks appelants ou fournisseurs ne peuvent plus réécrire les preuves retournées après fixation du passage évalué. Une donnée non copiable est refusée avant tout appel. Formats JSON, indices et ordre des scores restent inchangés ; cela ne prouve pas l’authenticité de la source.
+
+Le cache refuse les horloges non finies et les expirations hors précision entière ; une erreur ne remplace pas un score existant.
